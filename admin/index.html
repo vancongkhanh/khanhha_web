@@ -457,7 +457,21 @@
       <div class="section-head">
         <div><h3 style="font-size:16px;">Hộp thư liên hệ</h3><p>Tin nhắn khách gửi từ form ở trang Liên hệ</p></div>
       </div>
-      <div class="card" id="messagesList"></div>
+      <div class="card">
+        <div id="messagesList"></div>
+        <div class="pagination-bar">
+          <div class="page-size-select">
+            <label for="mfilter-pagesize">Số tin/trang</label>
+            <select id="mfilter-pagesize">
+              <option value="10">10</option>
+              <option value="20">20</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </div>
+          <div class="pagination-controls" id="messagesPagination"></div>
+        </div>
+      </div>
     </div>
 
     <!-- ===== Settings: Giao diện ===== -->

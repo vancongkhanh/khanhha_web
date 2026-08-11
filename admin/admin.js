@@ -371,14 +371,12 @@ function renderProducts() {
       ? "background-image:url('" + storagePathToUrl(p.images[0]) + "');background-size:cover;background-position:center;"
       : 'background:' + color;
     var iconSvg = hasImage ? '' : '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.5">' + (CATEGORY_ICONS[categoryIconKey(p.category)] || '') + '</svg>';
-    var stockBadge = !p.stock ? '<span class="badge badge-warn">Hết hàng</span>' : '';
-    var featuredBadge = p.isFeatured ? '<span class="badge badge-ok">Bán chạy</span>' : '';
     return '<tr>' +
       '<td><div class="cell-name"><div class="prod-thumb-sm" style="' + thumbStyle + '">' + iconSvg + '</div>' + escapeHtml(p.name) + '</div></td>' +
       '<td>' + escapeHtml(categoryName(p.category)) + '</td>' +
       '<td>' + formatVND(p.price) + '</td>' +
-      '<td><div class="cell-toggle"><label class="switch"><input type="checkbox" ' + (p.stock ? 'checked' : '') + ' onchange="adminToggleProductField(\'' + p.id + '\',\'stock\',this.checked)"><span class="slider"></span></label>' + stockBadge + '</div></td>' +
-      '<td><div class="cell-toggle"><label class="switch"><input type="checkbox" ' + (p.isFeatured ? 'checked' : '') + ' onchange="adminToggleProductField(\'' + p.id + '\',\'featured\',this.checked)"><span class="slider"></span></label>' + featuredBadge + '</div></td>' +
+      '<td><label class="switch"><input type="checkbox" ' + (p.stock ? 'checked' : '') + ' onchange="adminToggleProductField(\'' + p.id + '\',\'stock\',this.checked)"><span class="slider"></span></label></td>' +
+      '<td><label class="switch"><input type="checkbox" ' + (p.isFeatured ? 'checked' : '') + ' onchange="adminToggleProductField(\'' + p.id + '\',\'featured\',this.checked)"><span class="slider"></span></label></td>' +
       '<td><div class="row-actions">' +
       '<button class="icon-btn" title="Sửa" onclick="adminOpenProductModal(\'edit\',\'' + p.id + '\')">' + editIcon() + '</button>' +
       '<button class="icon-btn" title="Xoá" onclick="adminOpenDeleteConfirm(\'product\',\'' + p.id + '\')">' + trashIcon() + '</button>' +
@@ -681,15 +679,20 @@ function saveCategory(slug) {
    XOÁ (sản phẩm / danh mục)
    ======================================================================= */
 
+var DELETE_TYPE_LABELS = { product: 'sản phẩm', category: 'danh mục', message: 'tin nhắn' };
+
 function openDeleteConfirm(type, id) {
   var name = '', productCount = 0;
   if (type === 'product') {
     var p = productsCache.find(function (x) { return x.id === id; });
     name = p ? p.name : '';
-  } else {
+  } else if (type === 'category') {
     var c = categoriesCache.find(function (x) { return x.slug === id; });
     name = c ? c.name : '';
     productCount = productsCache.filter(function (x) { return x.category === id; }).length;
+  } else if (type === 'message') {
+    var m = messagesCache.find(function (x) { return x.id === id; });
+    name = m ? (m.name + ' — ' + m.content.slice(0, 60) + (m.content.length > 60 ? '…' : '')) : '';
   }
 
   var deleteBtn = productCount > 0
@@ -699,7 +702,7 @@ function openDeleteConfirm(type, id) {
   var panel = document.getElementById('modalPanel');
   panel.className = 'modal-panel modal-sm';
   panel.innerHTML =
-    '<div class="modal-head"><h3>Xoá ' + (type === 'product' ? 'sản phẩm' : 'danh mục') + '?</h3><button class="modal-close" onclick="adminCloseModal()">' + closeXIcon() + '</button></div>' +
+    '<div class="modal-head"><h3>Xoá ' + DELETE_TYPE_LABELS[type] + '?</h3><button class="modal-close" onclick="adminCloseModal()">' + closeXIcon() + '</button></div>' +
     '<div class="modal-body">' +
     '<p style="font-size:14px;margin-bottom:14px;">Bạn có chắc muốn xoá <strong>"' + escapeHtml(name) + '"</strong>? Hành động này không thể hoàn tác.</p>' +
     (productCount > 0
@@ -712,10 +715,11 @@ function openDeleteConfirm(type, id) {
 }
 
 function confirmDelete(type, id) {
-  var promise = type === 'product' ? deleteDoc(doc(db, 'products', id)) : deleteDoc(doc(db, 'categories', id));
-  promise.then(function () {
-    showToast(type === 'product' ? 'Đã xoá sản phẩm' : 'Đã xoá danh mục');
+  var collectionName = type === 'product' ? 'products' : (type === 'category' ? 'categories' : 'messages');
+  deleteDoc(doc(db, collectionName, id)).then(function () {
+    showToast('Đã xoá ' + DELETE_TYPE_LABELS[type]);
     closeModal();
+    closeDrawer();
   }).catch(function (err) {
     console.error(err);
     showToast('Xoá thất bại');
@@ -726,10 +730,36 @@ function confirmDelete(type, id) {
    HỘP THƯ
    ======================================================================= */
 
+var messagePage = 1;
+var messagePageSize = 10;
+
+function renderMessagesPagination(totalItems) {
+  var container = document.getElementById('messagesPagination');
+  if (!container) return;
+  var totalPages = Math.max(1, Math.ceil(totalItems / messagePageSize));
+  if (messagePage > totalPages) messagePage = totalPages;
+  if (messagePage < 1) messagePage = 1;
+  container.innerHTML =
+    '<button class="page-btn" ' + (messagePage <= 1 ? 'disabled' : '') + ' onclick="adminGoToMessagePage(' + (messagePage - 1) + ')">‹ Trước</button>' +
+    '<span class="page-info">Trang ' + messagePage + ' / ' + totalPages + '</span>' +
+    '<button class="page-btn" ' + (messagePage >= totalPages ? 'disabled' : '') + ' onclick="adminGoToMessagePage(' + (messagePage + 1) + ')">Sau ›</button>';
+}
+
+function goToMessagePage(page) {
+  messagePage = page;
+  renderMessages();
+}
+
 function renderMessages() {
   var list = document.getElementById('messagesList');
   if (!list) return;
-  list.innerHTML = messagesCache.map(function (m) {
+
+  renderMessagesPagination(messagesCache.length);
+
+  var startIdx = (messagePage - 1) * messagePageSize;
+  var pageItems = messagesCache.slice(startIdx, startIdx + messagePageSize);
+
+  list.innerHTML = pageItems.map(function (m) {
     var badgeClass = m.status === 'moi' ? 'badge-warn' : 'badge-ok';
     var badgeLabel = m.status === 'moi' ? 'Mới' : 'Đã liên hệ';
     var phoneDigits = (m.phone || '').replace(/[^0-9+]/g, '');
@@ -746,9 +776,16 @@ function renderMessages() {
       '<a class="btn btn-outline btn-sm" href="' + telHref + '" onclick="event.stopPropagation()">📞 Gọi ngay</a>' +
       '<a class="btn btn-outline btn-sm" href="' + zaloHref + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">💬 Nhắn Zalo</a>' +
       '<span class="btn-ghost btn-sm">Xem chi tiết →</span>' +
+      '<button class="icon-btn" title="Xoá tin nhắn" onclick="event.stopPropagation();adminOpenDeleteConfirm(\'message\',\'' + m.id + '\')">' + trashIcon() + '</button>' +
       '</div></div></div>';
   }).join('') || '<p class="hint" style="padding:20px;">Chưa có tin nhắn nào.</p>';
 }
+
+document.getElementById('mfilter-pagesize').addEventListener('change', function () {
+  messagePageSize = Number(this.value) || 10;
+  messagePage = 1;
+  renderMessages();
+});
 
 function renderRecentMessages() {
   var list = document.getElementById('recentMessagesList');
@@ -793,6 +830,7 @@ function openMessageDetail(id) {
     '<div class="drawer-foot">' +
     '<a class="btn btn-outline" style="flex:1;text-align:center;" href="' + telHref + '">📞 Gọi ngay</a>' +
     '<a class="btn btn-primary" style="flex:1;text-align:center;" href="' + zaloHref + '" target="_blank" rel="noopener">💬 Nhắn Zalo</a>' +
+    '<button class="icon-btn" title="Xoá tin nhắn" onclick="adminOpenDeleteConfirm(\'message\',\'' + m.id + '\')">' + trashIcon() + '</button>' +
     '</div>';
 
   document.getElementById('drawerOverlay').classList.add('open');
@@ -1016,6 +1054,7 @@ window.adminOpenProductModal = openProductModal;
 window.adminSaveProduct = saveProduct;
 window.adminToggleProductField = toggleProductField;
 window.adminGoToProductPage = goToProductPage;
+window.adminGoToMessagePage = goToMessagePage;
 window.adminRemoveProductImage = removeProductImage;
 window.adminHandleProductImageDrop = handleProductImageDrop;
 window.adminOpenCategoryModal = openCategoryModal;

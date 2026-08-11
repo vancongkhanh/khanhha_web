@@ -98,20 +98,23 @@ function applySiteConfig() {
  * Tải document settings/main từ Firestore, thay thế SITE_CONFIG mặc định
  * bằng dữ liệu thật do chủ shop tự chỉnh trong trang Admin.
  */
-async function loadSiteConfig() {
-  try {
-    var snap = await getDoc(doc(db, 'settings', 'main'));
-    if (snap.exists()) {
-      SITE_CONFIG = snap.data();
-      if (SITE_CONFIG.appearance && SITE_CONFIG.appearance.logo) {
-        SITE_CONFIG.appearance.logo = storagePathToUrl(SITE_CONFIG.appearance.logo);
+function loadSiteConfig() {
+  return (async function () {
+    try {
+      var snap = await getDoc(doc(db, 'settings', 'main'));
+      if (snap.exists()) {
+        SITE_CONFIG = snap.data();
+        if (SITE_CONFIG.appearance && SITE_CONFIG.appearance.logo) {
+          SITE_CONFIG.appearance.logo = storagePathToUrl(SITE_CONFIG.appearance.logo);
+        }
+        applySiteConfig();
+        initZaloFollow();
       }
-      applySiteConfig();
-      initZaloFollow();
+    } catch (err) {
+      console.error('Không tải được cấu hình cửa hàng:', err);
     }
-  } catch (err) {
-    console.error('Không tải được cấu hình cửa hàng:', err);
-  }
+    return SITE_CONFIG;
+  })();
 }
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -122,8 +125,8 @@ document.addEventListener('DOMContentLoaded', function () {
   initSpaceTabs();
   initZaloFollow();
   initContactForm();
-  loadSiteConfig();
-  initHomepageData();
+  var configPromise = loadSiteConfig();
+  initHomepageData(configPromise);
   initProductsPageData();
   initProductDetailPage();
 });
@@ -473,6 +476,7 @@ async function fetchProducts(opts) {
   opts = opts || {};
   var constraints = [where('isActive', '==', true)];
   if (opts.featuredOnly) constraints.push(where('isFeatured', '==', true));
+  if (opts.category) constraints.push(where('category', '==', opts.category));
   var snap = await getDocs(query(collection(db, 'products'), ...constraints));
   return snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
 }
@@ -537,26 +541,25 @@ function renderProductGrid(container, products, categories) {
  * Trang chủ: danh mục (cat-grid) lấy từ categories, mục "Bán chạy" lấy
  * sản phẩm có isFeatured: true.
  */
-async function initHomepageData() {
+async function initHomepageData(configPromise) {
   var catGrid = document.getElementById('categoryGrid');
   var featuredGrid = document.getElementById('featuredProductGrid');
   if (!catGrid && !featuredGrid) return;
 
   try {
-    var categories = await fetchCategories();
+    var results = await Promise.all([
+      fetchCategories(),
+      featuredGrid ? fetchProducts({ featuredOnly: true }) : Promise.resolve(null),
+      configPromise || Promise.resolve(SITE_CONFIG)
+    ]);
+    var categories = results[0];
+    var featured = results[1];
+    var config = results[2];
+
     renderCategoryGrid(catGrid, categories);
 
-    if (featuredGrid) {
-      var featuredLimit = 8;
-      try {
-        var settingsSnap = await getDoc(doc(db, 'settings', 'main'));
-        if (settingsSnap.exists()) {
-          var s = settingsSnap.data();
-          if (s.appearance && s.appearance.featuredLimit) featuredLimit = Number(s.appearance.featuredLimit) || 8;
-        }
-      } catch (e) { /* dùng mặc định 8 nếu không đọc được settings */ }
-
-      var featured = await fetchProducts({ featuredOnly: true });
+    if (featuredGrid && featured) {
+      var featuredLimit = (config && config.appearance && config.appearance.featuredLimit) || 8;
       featured.sort(function (a, b) {
         var at = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : 0;
         var bt = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : 0;
@@ -580,9 +583,10 @@ async function initProductsPageData() {
   var filterBar = document.getElementById('categoryFilterBar');
 
   try {
-    var categories = await fetchCategories();
+    var results = await Promise.all([fetchCategories(), fetchProducts()]);
+    var categories = results[0];
+    var products = results[1];
     renderCategoryFilterBar(filterBar, categories);
-    var products = await fetchProducts();
     renderProductGrid(grid, products, categories);
   } catch (err) {
     console.error('Không tải được danh sách sản phẩm:', err);
@@ -608,23 +612,28 @@ async function initProductDetailPage() {
   }
 
   try {
-    var snap = await getDoc(doc(db, 'products', id));
+    var initial = await Promise.all([
+      getDoc(doc(db, 'products', id)),
+      fetchCategories()
+    ]);
+    var snap = initial[0];
+    var categories = initial[1];
+
     if (!snap.exists() || snap.data().isActive === false) {
       root.innerHTML = '<p class="empty-state">Sản phẩm không tồn tại hoặc đã ngừng bán.</p>';
       return;
     }
 
     var product = Object.assign({ id: snap.id }, snap.data());
-    var categories = await fetchCategories();
     var cat = categories.find(function (c) { return c.slug === product.category; }) || {};
 
     document.title = product.name + ' – Cửa hàng Khánh Hà';
     updateProductBreadcrumb(product, cat);
     renderProductDetail(root, product, cat);
 
-    var allProducts = await fetchProducts();
-    var related = allProducts
-      .filter(function (p) { return p.category === product.category && p.id !== product.id; })
+    var sameCategoryProducts = await fetchProducts({ category: product.category });
+    var related = sameCategoryProducts
+      .filter(function (p) { return p.id !== product.id; })
       .slice(0, 4);
 
     var relatedSection = document.getElementById('relatedSection');
