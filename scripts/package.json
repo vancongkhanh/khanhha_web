@@ -1,0 +1,13 @@
+{
+  "name": "khanhha-seed",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Script nạp dữ liệu mẫu vào Firestore cho website Khánh Hà",
+  "type": "commonjs",
+  "scripts": {
+    "seed": "node seed.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.0.0"
+  }
+}

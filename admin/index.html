@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin – Cửa hàng Khánh Hà (Mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="icon" href="../assets/img/favicon.png" type="image/png">
+<style>
+  :root{
+    --pine:#1B4B5A; --pine-light:#2E6E7E; --pine-pale:#E3EEEC;
+    --copper:#D9642F; --copper-pale:#F7E2D3;
+    --bg:#F5F6F5; --card:#FFFFFF; --ink:#26302F; --muted:#6B6D63;
+    --border:rgba(31,59,44,.12); --radius:12px;
+    --ok:#2E7D4F; --ok-bg:#E5F3EA; --warn:#B4552B; --warn-bg:#FBE9DF;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--ink);display:flex;min-height:100vh;}
+  h1,h2,h3{font-family:'Fraunces',serif;font-weight:600;color:var(--pine);}
+  button{font-family:inherit;cursor:pointer;}
+  input,select,textarea{font-family:inherit;}
+
+  /* ===== Sidebar ===== */
+  .sidebar{
+    width:240px;flex:none;background:var(--pine);color:#EAF1EE;
+    display:flex;flex-direction:column;padding:20px 0;position:sticky;top:0;height:100vh;
+  }
+  .sidebar-brand{display:flex;align-items:center;gap:10px;padding:0 20px 20px;border-bottom:1px solid rgba(255,255,255,.12);margin-bottom:12px;}
+  .sidebar-brand .logo-dot{width:34px;height:34px;border-radius:50%;overflow:hidden;flex:none;}
+  .sidebar-brand .logo-dot img{width:100%;height:100%;object-fit:cover;}
+  .sidebar-brand .name{font-weight:600;font-size:14.5px;color:#fff;}
+  .sidebar-brand .sub{font-size:11px;color:#B9CCC5;}
+  .nav-group{margin-bottom:6px;}
+  .nav-label{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:#8FAAA2;padding:14px 20px 6px;}
+  .nav-item{
+    display:flex;align-items:center;gap:12px;padding:10px 20px;font-size:14px;font-weight:500;
+    color:#D9E6E1;cursor:pointer;border-left:3px solid transparent;
+  }
+  .nav-item svg{width:18px;height:18px;flex:none;stroke:currentColor;}
+  .nav-item:hover{background:rgba(255,255,255,.06);}
+  .nav-item.active{background:rgba(255,255,255,.1);border-left-color:var(--copper);color:#fff;}
+  .nav-sub{display:flex;flex-direction:column;}
+  .nav-sub-item{padding:8px 20px 8px 50px;font-size:13px;color:#C6D9D3;cursor:pointer;border-left:3px solid transparent;}
+  .nav-sub-item:hover{color:#fff;}
+  .nav-sub-item.active{color:#fff;border-left-color:var(--copper);background:rgba(255,255,255,.06);}
+
+  /* ===== Main ===== */
+  .main{flex:1;display:flex;flex-direction:column;min-width:0;}
+  .topbar{
+    background:var(--card);border-bottom:1px solid var(--border);padding:16px 32px;
+    display:flex;align-items:center;justify-content:space-between;
+  }
+  .topbar h2{font-size:19px;}
+  .topbar .who{display:flex;align-items:center;gap:10px;font-size:13.5px;color:var(--muted);}
+  .avatar{width:32px;height:32px;border-radius:50%;background:var(--copper-pale);display:flex;align-items:center;justify-content:center;color:var(--copper);font-weight:600;font-size:12.5px;}
+  .content{padding:28px 32px;flex:1;}
+  .page{display:none;}
+  .page.active{display:block;}
+
+  /* ===== Cards / generic ===== */
+  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);}
+  .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px;}
+  .stat-card{padding:18px 20px;}
+  .stat-card .label{font-size:12.5px;color:var(--muted);margin-bottom:6px;}
+  .stat-card .value{font-size:26px;font-weight:600;font-family:'Fraunces',serif;color:var(--pine);}
+  .stat-card .value.alert{color:var(--warn);}
+  .section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+  .section-head p{font-size:13px;color:var(--muted);margin-top:2px;}
+  .btn{
+    display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:999px;
+    font-size:13.5px;font-weight:600;border:none;text-decoration:none;
+  }
+  .btn-primary{background:var(--copper);color:#fff;}
+  .btn-outline{background:transparent;border:1.5px solid var(--border);color:var(--ink);}
+  .btn-ghost{background:transparent;color:var(--pine);font-weight:600;font-size:13px;padding:6px 10px;}
+  .btn-sm{padding:6px 12px;font-size:12.5px;}
+
+  /* ===== Table ===== */
+  table{width:100%;border-collapse:collapse;}
+  th{text-align:left;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);padding:12px 16px;border-bottom:1px solid var(--border);}
+  td{padding:12px 16px;border-bottom:1px solid var(--border);font-size:14px;vertical-align:middle;}
+  tr:last-child td{border-bottom:none;}
+  .prod-thumb-sm{width:40px;height:40px;border-radius:8px;flex:none;display:flex;align-items:center;justify-content:center;}
+  .prod-thumb-sm svg{width:20px;height:20px;stroke:#fff;}
+  .cell-name{display:flex;align-items:center;gap:12px;font-weight:500;}
+  .badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;}
+  .badge-ok{background:var(--ok-bg);color:var(--ok);}
+  .badge-warn{background:var(--warn-bg);color:var(--warn);}
+  .row-actions{display:flex;gap:6px;}
+  .icon-btn{width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:#fff;display:flex;align-items:center;justify-content:center;}
+  .icon-btn svg{width:15px;height:15px;stroke:var(--muted);}
+  .icon-btn:hover svg{stroke:var(--copper);}
+
+  /* ===== Bộ lọc sản phẩm ===== */
+  .filter-toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;}
+  .filter-toolbar input,.filter-toolbar select{
+    padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);font-size:13px;background:#fff;color:var(--ink);
+  }
+  .filter-toolbar input{flex:1;min-width:180px;}
+  .filter-toolbar input:focus,.filter-toolbar select:focus{outline:none;border-color:var(--copper);}
+
+  /* Toggle switch */
+  .switch{position:relative;width:38px;height:22px;flex:none;}
+  .switch input{opacity:0;width:0;height:0;}
+  .slider{position:absolute;inset:0;background:#D8DDD9;border-radius:999px;cursor:pointer;transition:.2s;}
+  .slider::before{content:'';position:absolute;width:16px;height:16px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s;}
+  .switch input:checked + .slider{background:var(--ok);}
+  .switch input:checked + .slider::before{transform:translateX(16px);}
+
+  /* ===== Category grid ===== */
+  .cat-admin-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+  .cat-admin-card{padding:18px;display:flex;align-items:center;gap:14px;}
+  .cat-admin-card .ic{width:44px;height:44px;border-radius:10px;background:var(--pine-pale);display:flex;align-items:center;justify-content:center;flex:none;}
+  .cat-admin-card .ic svg{width:22px;height:22px;stroke:var(--pine);}
+  .cat-admin-card .info{flex:1;min-width:0;}
+  .cat-admin-card .info .name{font-weight:600;font-size:14.5px;}
+  .cat-admin-card .info .count{font-size:12px;color:var(--muted);}
+  .cat-admin-card.add-new{border:1.5px dashed var(--border);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13.5px;font-weight:600;gap:8px;cursor:pointer;}
+
+  /* ===== Inbox ===== */
+  .msg-item{display:flex;gap:14px;padding:16px;border-bottom:1px solid var(--border);}
+  .msg-item:last-child{border-bottom:none;}
+  .msg-avatar{width:38px;height:38px;border-radius:50%;background:var(--pine-pale);color:var(--pine);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;flex:none;}
+  .msg-body{flex:1;min-width:0;}
+  .msg-top{display:flex;justify-content:space-between;gap:10px;margin-bottom:3px;}
+  .msg-top .name{font-weight:600;font-size:14px;}
+  .msg-top .time{font-size:12px;color:var(--muted);white-space:nowrap;}
+  .msg-content{font-size:13.5px;color:var(--ink);margin-bottom:10px;}
+  .msg-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+
+  /* ===== Settings ===== */
+  .settings-tabs{display:flex;gap:6px;margin-bottom:22px;border-bottom:1px solid var(--border);}
+  .settings-tab{padding:10px 4px;margin-right:22px;font-size:14px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;}
+  .settings-tab.active{color:var(--pine);border-bottom-color:var(--copper);}
+  .settings-panel{display:none;}
+  .settings-panel.active{display:block;}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+  .form-field{display:flex;flex-direction:column;gap:6px;}
+  .form-field.full{grid-column:1/-1;}
+  .form-field label{font-size:12.5px;font-weight:600;color:var(--ink);}
+  .form-field .hint{font-size:11.5px;color:var(--muted);font-weight:400;}
+  .form-field input,.form-field textarea{
+    padding:10px 12px;border-radius:8px;border:1.5px solid var(--border);font-size:13.5px;background:#fff;
+  }
+  .form-field textarea{min-height:70px;resize:vertical;}
+  .form-field input:focus,.form-field textarea:focus{outline:none;border-color:var(--copper);}
+  .logo-upload{display:flex;align-items:center;gap:16px;}
+  .logo-upload .preview{width:64px;height:64px;border-radius:50%;overflow:hidden;background:var(--pine);display:flex;align-items:center;justify-content:center;}
+  .logo-upload .preview img{width:100%;height:100%;object-fit:cover;}
+  .save-bar{display:flex;justify-content:flex-end;gap:10px;margin-top:24px;padding-top:20px;border-top:1px solid var(--border);}
+
+  @media (max-width:960px){
+    .sidebar{position:fixed;left:-240px;z-index:50;transition:left .2s;}
+    .stat-grid{grid-template-columns:1fr 1fr;}
+    .form-grid{grid-template-columns:1fr;}
+    .cat-admin-grid{grid-template-columns:1fr 1fr;}
+  }
+
+  @media (max-width:640px){
+    .msg-top{flex-direction:column;align-items:flex-start;gap:2px;}
+    .msg-top .time{font-size:11px;}
+    .filter-toolbar input,.filter-toolbar select{flex:1 1 100%;min-width:0;}
+  }
+
+  /* ===== Modal (thêm/sửa/xoá) ===== */
+  .modal-overlay{
+    display:none;position:fixed;inset:0;background:rgba(20,30,28,.45);z-index:100;
+    align-items:center;justify-content:center;padding:20px;
+  }
+  .modal-overlay.open{display:flex;}
+  .modal-panel{
+    background:var(--card);border-radius:var(--radius);width:100%;max-width:560px;
+    max-height:88vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.25);
+  }
+  .modal-panel.modal-sm{max-width:420px;}
+  .modal-head{display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--border);}
+  .modal-head h3{font-size:17px;}
+  .modal-close{background:none;border:none;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--muted);}
+  .modal-close:hover{background:var(--bg);}
+  .modal-close svg{width:18px;height:18px;}
+  .modal-body{padding:22px 24px;}
+  .modal-foot{display:flex;justify-content:flex-end;gap:10px;padding:16px 24px;border-top:1px solid var(--border);}
+
+  /* Upload ảnh sản phẩm */
+  .image-upload-row{display:flex;gap:10px;flex-wrap:wrap;}
+  .image-slot{
+    width:76px;height:76px;border-radius:10px;background:var(--bg);border:1px solid var(--border);
+    display:flex;align-items:center;justify-content:center;position:relative;flex:none;overflow:hidden;
+  }
+  .image-slot svg{width:22px;height:22px;stroke:#fff;}
+  .image-slot.add-slot{border:1.5px dashed var(--border);background:transparent;color:var(--muted);flex-direction:column;gap:4px;font-size:10.5px;cursor:pointer;}
+  .image-slot.add-slot svg{stroke:var(--muted);width:18px;height:18px;}
+  .image-slot.add-slot.drag-over{border-color:var(--copper);background:var(--copper-pale);color:var(--copper);}
+  .image-slot.add-slot.drag-over svg{stroke:var(--copper);}
+  .image-slot .remove{position:absolute;top:3px;right:3px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;cursor:pointer;}
+  .image-slot .remove svg{width:10px;height:10px;stroke:#fff;}
+
+  /* Icon picker (danh mục) */
+  .icon-picker{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;}
+  .icon-option{
+    aspect-ratio:1;border-radius:10px;border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;
+    cursor:pointer;background:#fff;
+  }
+  .icon-option svg{width:20px;height:20px;stroke:var(--pine);}
+  .icon-option.selected{border-color:var(--copper);background:var(--copper-pale);}
+
+  .delete-warning{
+    display:flex;gap:12px;background:var(--warn-bg);border-radius:10px;padding:14px;font-size:13.5px;color:var(--warn);
+  }
+  .delete-warning svg{width:20px;height:20px;flex:none;stroke:var(--warn);}
+
+  .clickable-row{cursor:pointer;}
+  .clickable-row:hover{background:var(--bg);}
+
+  /* ===== Drawer chi tiết hộp thư ===== */
+  .drawer-overlay{
+    display:none;position:fixed;inset:0;background:rgba(20,30,28,.4);z-index:100;
+  }
+  .drawer-overlay.open{display:block;}
+  .drawer-panel{
+    position:fixed;top:0;right:0;height:100vh;width:100%;max-width:420px;background:var(--card);
+    box-shadow:-16px 0 40px rgba(0,0,0,.18);display:flex;flex-direction:column;
+  }
+  .drawer-head{display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--border);}
+  .drawer-body{padding:22px 24px;flex:1;overflow-y:auto;}
+  .drawer-foot{padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:10px;}
+  .detail-row{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border);font-size:13.5px;}
+  .detail-row span:first-child{color:var(--muted);}
+  .detail-row span:last-child{font-weight:600;}
+  .status-select{display:flex;gap:8px;margin:16px 0;}
+  .status-opt{flex:1;text-align:center;padding:9px;border-radius:8px;border:1.5px solid var(--border);font-size:12.5px;font-weight:600;cursor:pointer;color:var(--muted);}
+  .status-opt.selected.new{border-color:var(--warn);color:var(--warn);background:var(--warn-bg);}
+  .status-opt.selected.done{border-color:var(--ok);color:var(--ok);background:var(--ok-bg);}
+
+  .toast{
+    position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--pine);color:#fff;
+    padding:12px 22px;border-radius:999px;font-size:13.5px;font-weight:600;box-shadow:0 12px 30px rgba(0,0,0,.2);
+    opacity:0;pointer-events:none;transition:.25s;z-index:200;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  /* ===== Đăng nhập ===== */
+  .login-overlay{
+    display:none;position:fixed;inset:0;background:var(--bg);z-index:300;
+    align-items:center;justify-content:center;padding:20px;
+  }
+  .login-overlay.open{display:flex;}
+  .login-card{
+    background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+    width:100%;max-width:360px;padding:30px 28px;box-shadow:0 20px 50px rgba(0,0,0,.08);
+    display:flex;flex-direction:column;gap:14px;
+  }
+  .login-card .login-logo{width:52px;height:52px;border-radius:50%;overflow:hidden;margin:0 auto 4px;}
+  .login-card .login-logo img{width:100%;height:100%;object-fit:cover;}
+  .login-card h2{font-size:19px;text-align:center;}
+  .login-card .hint{font-size:12.5px;color:var(--muted);text-align:center;margin-top:-8px;margin-bottom:6px;}
+  .login-card .form-field label{font-size:12.5px;font-weight:600;color:var(--ink);}
+  .login-card .form-field input{
+    width:100%;padding:10px 12px;border-radius:8px;border:1.5px solid var(--border);font-size:13.5px;margin-top:6px;
+  }
+  .login-card .form-field input:focus{outline:none;border-color:var(--copper);}
+  .login-error{font-size:12.5px;color:var(--warn);min-height:1em;text-align:center;}
+  .login-card .btn{width:100%;justify-content:center;margin-top:4px;}
+  .password-field{position:relative;}
+  .password-field input{padding-right:40px;}
+  .password-toggle{
+    position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;
+    width:28px;height:28px;display:flex;align-items:center;justify-content:center;color:var(--muted);border-radius:6px;
+  }
+  .password-toggle:hover{background:var(--bg);}
+  .password-toggle svg{width:18px;height:18px;}
+  .password-toggle.showing{color:var(--copper);}
+  .remember-row{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink);cursor:pointer;margin-top:-4px;}
+  .remember-row input{width:15px;height:15px;}
+</style>
+</head>
+<body>
+
+<!-- Đăng nhập -->
+<div class="login-overlay open" id="loginScreen">
+  <form class="login-card" id="loginForm">
+    <div class="login-logo"><img src="../assets/img/logo.png" alt="Logo Khánh Hà"></div>
+    <h2>Đăng nhập quản trị</h2>
+    <p class="hint">Trang quản trị Cửa hàng Khánh Hà</p>
+    <div class="form-field">
+      <label>Email</label>
+      <input id="login-email" type="email" required placeholder="ban@khanhha.vn" autocomplete="username">
+    </div>
+    <div class="form-field">
+      <label>Mật khẩu</label>
+      <div class="password-field">
+        <input id="login-password" type="password" required placeholder="••••••••" autocomplete="current-password">
+        <button type="button" class="password-toggle" id="passwordToggleBtn" aria-label="Hiện mật khẩu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+    </div>
+    <label class="remember-row">
+      <input type="checkbox" id="login-remember" checked>
+      <span>Ghi nhớ tài khoản</span>
+    </label>
+    <p class="login-error" id="loginError"></p>
+    <button class="btn btn-primary" type="submit">Đăng nhập</button>
+  </form>
+</div>
+
+<!-- Sidebar -->
+<aside class="sidebar" id="appSidebar" style="display:none;">
+  <div class="sidebar-brand">
+    <div class="logo-dot"><img src="../assets/img/logo.png" alt="Logo Khánh Hà"></div>
+    <div>
+      <div class="name">Khánh Hà</div>
+      <div class="sub">Trang quản trị</div>
+    </div>
+  </div>
+
+  <div class="nav-group">
+    <div class="nav-item active" data-page="dashboard">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg>
+      Tổng quan
+    </div>
+    <div class="nav-item" data-page="products">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h16v2a7 7 0 0 1-7 7H11a7 7 0 0 1-7-7V9Z"/><path d="M8 9V6a4 4 0 0 1 8 0v3"/></svg>
+      Sản phẩm
+    </div>
+    <div class="nav-item" data-page="categories">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>
+      Danh mục
+    </div>
+    <div class="nav-item" data-page="messages">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H7l-3 3V5Z"/></svg>
+      Hộp thư
+      <span style="margin-left:auto;background:var(--copper);color:#fff;font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:999px;">2</span>
+    </div>
+  </div>
+
+  <div class="nav-group">
+    <div class="nav-label">Cài đặt</div>
+    <div class="nav-sub">
+      <div class="nav-sub-item active" data-page="settings-appearance">Giao diện</div>
+      <div class="nav-sub-item" data-page="settings-store">Thông tin cửa hàng</div>
+      <div class="nav-sub-item" data-page="settings-links">Liên kết</div>
+    </div>
+  </div>
+</aside>
+
+<!-- Main -->
+<div class="main" id="appMain" style="display:none;">
+  <div class="topbar">
+    <h2 id="pageTitle">Tổng quan</h2>
+    <div class="who">
+      <span id="topbarUserEmail">—</span>
+      <div class="avatar">KH</div>
+      <button class="icon-btn" id="logoutBtn" title="Đăng xuất">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- ===== Dashboard ===== -->
+    <div class="page active" id="page-dashboard">
+      <div class="stat-grid">
+        <div class="card stat-card"><div class="label">Tổng sản phẩm</div><div class="value">42</div></div>
+        <div class="card stat-card"><div class="label">Hết hàng</div><div class="value alert">3</div></div>
+        <div class="card stat-card"><div class="label">Danh mục</div><div class="value">6</div></div>
+        <div class="card stat-card"><div class="label">Tin nhắn mới</div><div class="value alert">2</div></div>
+      </div>
+
+      <div class="card" style="padding:22px;">
+        <div class="section-head">
+          <div><h3 style="font-size:16px;">Tin nhắn gần đây</h3><p>Khách hỏi qua form Liên hệ trên web</p></div>
+          <span class="btn-ghost" onclick="showPage('messages')" style="cursor:pointer;">Xem hộp thư →</span>
+        </div>
+        <div id="recentMessagesList"></div>
+      </div>
+    </div>
+
+    <!-- ===== Products ===== -->
+    <div class="page" id="page-products">
+      <div class="section-head">
+        <div><h3 style="font-size:16px;">Danh sách sản phẩm</h3><p id="productsSubtitle">Đang tải...</p></div>
+        <button class="btn btn-primary" onclick="adminOpenProductModal('add')">+ Thêm sản phẩm</button>
+      </div>
+      <div class="filter-toolbar">
+        <input type="text" id="pfilter-search" placeholder="Tìm theo tên sản phẩm...">
+        <select id="pfilter-category"><option value="">Tất cả danh mục</option></select>
+        <select id="pfilter-stock">
+          <option value="">Còn hàng / hết hàng</option>
+          <option value="in">Còn hàng</option>
+          <option value="out">Hết hàng</option>
+        </select>
+        <select id="pfilter-featured">
+          <option value="">Bán chạy / thường</option>
+          <option value="yes">Bán chạy</option>
+          <option value="no">Không bán chạy</option>
+        </select>
+      </div>
+      <div class="card">
+        <table>
+          <thead><tr><th>Sản phẩm</th><th>Danh mục</th><th>Giá</th><th>Còn hàng</th><th>Bán chạy</th><th></th></tr></thead>
+          <tbody id="productsTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===== Categories ===== -->
+    <div class="page" id="page-categories">
+      <div class="section-head">
+        <div><h3 style="font-size:16px;">Danh mục sản phẩm</h3><p>Thứ tự hiển thị ở trang chủ và bộ lọc trang Sản phẩm</p></div>
+      </div>
+      <div class="cat-admin-grid" id="categoriesGrid"></div>
+    </div>
+
+    <!-- ===== Messages ===== -->
+    <div class="page" id="page-messages">
+      <div class="section-head">
+        <div><h3 style="font-size:16px;">Hộp thư liên hệ</h3><p>Tin nhắn khách gửi từ form ở trang Liên hệ</p></div>
+      </div>
+      <div class="card" id="messagesList"></div>
+    </div>
+
+    <!-- ===== Settings: Giao diện ===== -->
+    <div class="page" id="page-settings-appearance">
+      <div class="card" style="padding:24px;">
+        <div class="settings-tabs">
+          <div class="settings-tab active" data-settings="appearance">Giao diện</div>
+          <div class="settings-tab" data-settings="store">Thông tin cửa hàng</div>
+          <div class="settings-tab" data-settings="links">Liên kết</div>
+        </div>
+
+        <div class="settings-panel active" id="settings-appearance">
+          <div class="form-grid">
+            <div class="form-field full">
+              <label>Logo cửa hàng</label>
+              <div class="logo-upload">
+                <div class="preview"><img id="settingsLogoPreview" src="../assets/img/logo.png" alt="Logo hiện tại"></div>
+                <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('logoFileInput').click()">Tải ảnh lên</button>
+                <input type="file" id="logoFileInput" accept="image/*" style="display:none;">
+              </div>
+            </div>
+            <div class="form-field"><label>Tên cửa hàng</label><input id="set-storeName" value="Khánh Hà"></div>
+            <div class="form-field"><label>Mô tả ngắn (dưới tên)</label><input id="set-tagline" value="Đồ gia dụng Phan Thiết"></div>
+            <div class="form-field full"><label>Nhãn nhỏ trong banner đầu trang</label><input id="set-heroBadge" value="📍 Từ Phan Thiết, cho mọi nhà"></div>
+            <div class="form-field"><label>Tiêu đề banner — dòng 1</label><input id="set-heroTitle1" value="Tiện nghi mỗi ngày,"></div>
+            <div class="form-field"><label>Tiêu đề banner — từ nhấn mạnh (màu cam)</label><input id="set-heroHighlight" value="ấm áp"></div>
+            <div class="form-field full"><label>Tiêu đề banner — phần còn lại</label><input id="set-heroTitle2" value="mỗi góc nhà"></div>
+            <div class="form-field full">
+              <label>Mô tả banner đầu trang</label>
+              <textarea id="set-heroDesc">Khánh Hà chọn lọc đồ bếp, đồ điện gia dụng, kệ tủ inox và đồ nhựa bền chắc — mang sự gọn gàng, tiện lợi đến từng gia đình ở Phan Thiết.</textarea>
+            </div>
+          </div>
+          <div class="save-bar"><button class="btn btn-outline" onclick="cancelSettings('appearance')">Huỷ</button><button class="btn btn-primary" onclick="saveSettingsAppearance()">Lưu thay đổi</button></div>
+        </div>
+
+        <div class="settings-panel" id="settings-store">
+          <div class="form-grid">
+            <div class="form-field full"><label>Địa chỉ</label><input id="set-address" value="Km 3, xã Hàm Liêm, tỉnh Lâm Đồng"></div>
+            <div class="form-field full"><label class="hint">Ghi chú địa chỉ (hiện trong ngoặc, xuống dòng riêng)</label><input id="set-addressNote" value="(gần ngã ba Hàm Liêm, gần KCN Phan Thiết)"></div>
+            <div class="form-field"><label>Giờ mở cửa — Thứ 2 đến Thứ 7</label><input id="set-hoursWeekday" value="Thứ 2 – Thứ 7: 7:30 – 18:00"></div>
+            <div class="form-field"><label>Giờ mở cửa — Chủ nhật</label><input id="set-hoursSunday" value="Chủ nhật: 7:30 – 12:00"></div>
+            <div class="form-field"><label>Số điện thoại / Zalo (dùng chung)</label><input id="set-hotline" value="0898 999 039"></div>
+            <div class="form-field">
+              <label>Hiện banner miễn phí giao hàng</label>
+              <div style="display:flex;align-items:center;gap:10px;padding-top:6px;">
+                <label class="switch"><input type="checkbox" id="set-showShipping"><span class="slider"></span></label>
+                <span class="hint" id="set-showShippingLabel" style="font-size:12.5px;color:var(--muted);">Đang tắt</span>
+              </div>
+            </div>
+          </div>
+          <div class="save-bar"><button class="btn btn-outline" onclick="cancelSettings('store')">Huỷ</button><button class="btn btn-primary" onclick="saveSettingsStore()">Lưu thay đổi</button></div>
+        </div>
+
+        <div class="settings-panel" id="settings-links">
+          <div class="form-grid">
+            <div class="form-field full"><label>Link trang Facebook</label><input id="set-facebook" value="https://www.facebook.com/profile.php?id=61556893695042"></div>
+            <div class="form-field full"><label class="hint">Link Messenger (tự tạo từ Facebook ở trên)</label><input id="set-messenger" value="https://m.me/61556893695042" disabled style="opacity:.6;"></div>
+            <div class="form-field full"><label>Link Zalo cá nhân (nút "Nhắn Zalo")</label><input id="set-zaloPersonal" value="https://zalo.me/0898999039"></div>
+            <div class="form-field"><label>Zalo OA ID</label><input id="set-zaloOaId" placeholder="Chưa cấu hình — điền sau khi tạo Zalo OA"></div>
+            <div class="form-field"><label>Domain web (không kèm https://)</label><input id="set-zaloDomain" placeholder="ví dụ: khanhha.github.io"></div>
+            <div class="form-field full">
+              <label>Mã nhúng Google Maps</label>
+              <textarea id="set-mapsEmbed" placeholder="Dán link nhúng (embed) từ Google Maps → Chia sẻ → Nhúng bản đồ"></textarea>
+            </div>
+          </div>
+          <div class="save-bar"><button class="btn btn-outline" onclick="cancelSettings('links')">Huỷ</button><button class="btn btn-primary" onclick="saveSettingsLinks()">Lưu thay đổi</button></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Modal dùng chung: thêm/sửa sản phẩm, thêm/sửa danh mục, xác nhận xoá -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal-panel" id="modalPanel"></div>
+</div>
+<input type="file" id="pf-image-file" accept="image/*" style="display:none;">
+
+<!-- Drawer chi tiết tin nhắn -->
+<div class="drawer-overlay" id="drawerOverlay">
+  <div class="drawer-panel" id="drawerPanel"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module" src="admin.js"></script>
+</body>
+</html>

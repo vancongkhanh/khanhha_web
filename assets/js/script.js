@@ -1,0 +1,568 @@
+/* =====================================================================
+   CỬA HÀNG KHÁNH HÀ — SCRIPT DÙNG CHUNG
+   Dùng chung cho index.html, san-pham.html, facebook.html, lien-he.html.
+   Mỗi hàm tự kiểm tra phần tử có tồn tại trên trang hay không trước khi
+   gắn sự kiện, nên có thể nhúng an toàn ở mọi trang.
+
+   ES module (nạp bằng <script type="module">) — dùng Firestore để đọc
+   cấu hình cửa hàng, danh mục, sản phẩm và ghi tin nhắn liên hệ.
+   ===================================================================== */
+
+import { db } from './firebase-init.js';
+import {
+  collection, getDocs, getDoc, doc, query, where, orderBy, addDoc, serverTimestamp
+} from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js';
+
+/* ---------------------------------------------------------------------
+   SITE_CONFIG — toàn bộ nội dung có thể thay đổi của website. Giá trị
+   dưới đây chỉ là "mặc định dự phòng" để trang vẫn hiển thị được ngay
+   cả khi chưa tải xong (hoặc không tải được) dữ liệu từ Firestore.
+   Ngay khi loadSiteConfig() tải xong document settings/main, SITE_CONFIG
+   sẽ được thay bằng dữ liệu thật và applySiteConfig() chạy lại.
+
+   Mọi phần tử HTML có thuộc tính data-config="đường.dẫn.field" sẽ tự
+   được điền nội dung từ đây khi trang tải xong — không cần sửa HTML
+   ở nhiều nơi mỗi khi đổi thông tin.
+   --------------------------------------------------------------------- */
+var SITE_CONFIG = {
+  appearance: {
+    logo: 'assets/img/logo.png',
+    storeName: 'Khánh Hà',
+    tagline: 'Đồ gia dụng Phan Thiết',
+    hero: {
+      badge: '📍 Từ Phan Thiết, cho mọi nhà',
+      titleLine1: 'Tiện nghi mỗi ngày,',
+      titleHighlight: 'ấm áp',
+      titleLine2: 'mỗi góc nhà',
+      description: 'Khánh Hà chọn lọc đồ bếp, đồ điện gia dụng, kệ tủ inox và đồ nhựa bền chắc — mang sự gọn gàng, tiện lợi đến từng gia đình ở Phan Thiết.'
+    }
+  },
+  store: {
+    address: 'Km 3, xã Hàm Liêm, tỉnh Lâm Đồng',
+    addressNote: '(gần ngã ba Hàm Liêm, gần KCN Phan Thiết)',
+    hoursWeekday: 'Thứ 2 – Thứ 7: 7:30 – 18:00',
+    hoursSunday: 'Chủ nhật: 7:30 – 12:00',
+    phoneHref: 'tel:0898999039',
+    hotlineLabel: 'Hotline / Zalo: 0898 999 039'
+  },
+  links: {
+    facebook: 'https://www.facebook.com/profile.php?id=61556893695042',
+    messenger: 'https://m.me/61556893695042',
+    zaloPersonal: 'https://zalo.me/0898999039',
+    zaloOA: {
+      oaId: '',
+      domain: ''
+    },
+    googleMapsEmbed: 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d4661.718322375183!2d108.1030879757629!3d10.958275789201759!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3176830048081adf%3A0x36fb8c27aec15da1!2zQ-G7rWEgaMOgbmcgS2jDoW5oIEjDoA!5e1!3m2!1svi!2s!4v1786422811102!5m2!1svi!2s'
+  }
+};
+
+/**
+ * Đọc 1 giá trị lồng nhau trong SITE_CONFIG theo đường dẫn dạng "a.b.c".
+ */
+function getConfigValue(path) {
+  return path.split('.').reduce(function (obj, key) {
+    return obj ? obj[key] : undefined;
+  }, SITE_CONFIG);
+}
+
+/**
+ * Quét toàn trang, tìm mọi phần tử có data-config và điền nội dung
+ * tương ứng từ SITE_CONFIG — dùng data-config-attr để điền vào 1
+ * thuộc tính cụ thể (href, src, data-href...) thay vì nội dung chữ.
+ */
+function applySiteConfig() {
+  document.querySelectorAll('[data-config]').forEach(function (el) {
+    var value = getConfigValue(el.getAttribute('data-config'));
+    if (value === undefined || value === '') return;
+
+    var attr = el.getAttribute('data-config-attr');
+    if (attr) {
+      el.setAttribute(attr, value);
+    } else {
+      el.textContent = value;
+    }
+  });
+
+  // Facebook Page Plugin đã render thành iframe trước đó thì cần yêu cầu
+  // Facebook SDK dựng lại nếu link trang vừa được cấu hình lại.
+  if (window.FB && window.FB.XFBML) {
+    window.FB.XFBML.parse();
+  }
+}
+
+/**
+ * Tải document settings/main từ Firestore, thay thế SITE_CONFIG mặc định
+ * bằng dữ liệu thật do chủ shop tự chỉnh trong trang Admin.
+ */
+async function loadSiteConfig() {
+  try {
+    var snap = await getDoc(doc(db, 'settings', 'main'));
+    if (snap.exists()) {
+      SITE_CONFIG = snap.data();
+      if (SITE_CONFIG.appearance && SITE_CONFIG.appearance.logo) {
+        SITE_CONFIG.appearance.logo = storagePathToUrl(SITE_CONFIG.appearance.logo);
+      }
+      applySiteConfig();
+      initZaloFollow();
+    }
+  } catch (err) {
+    console.error('Không tải được cấu hình cửa hàng:', err);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  applySiteConfig();
+  initMobileNav();
+  initHeaderSearch();
+  initHeroSlideshow();
+  initSpaceTabs();
+  initZaloFollow();
+  initContactForm();
+  loadSiteConfig();
+  initHomepageData();
+  initProductsPageData();
+});
+
+/**
+ * Khung "Quan tâm Zalo OA" ở trang chủ.
+ * Nếu SITE_CONFIG.links.zaloOA.oaId chưa được điền, hiện tạm nút nhắn
+ * Zalo cá nhân thay thế, để mục này luôn có nội dung hữu ích cho khách.
+ */
+function initZaloFollow() {
+  var box = document.getElementById('zaloFollowBox');
+  if (!box) return;
+
+  var zaloOA = (SITE_CONFIG.links && SITE_CONFIG.links.zaloOA) || {};
+
+  if (zaloOA.oaId) {
+    var params = new URLSearchParams({
+      oaid: zaloOA.oaId,
+      width: '260',
+      height: '340',
+      cover: 'yes',
+      article: '0',
+      color: 'yes',
+      domain: zaloOA.domain || '',
+      android: 'true',
+      ios: 'true'
+    });
+    box.innerHTML = '';
+    var iframe = document.createElement('iframe');
+    iframe.src = 'https://sp.zalo.me/plugins/follow?' + params.toString();
+    iframe.width = '260';
+    iframe.height = '340';
+    iframe.style.overflow = 'hidden';
+    box.appendChild(iframe);
+  } else {
+    box.innerHTML =
+      '<div class="zalo-follow-fallback">' +
+      '<p>Kênh Zalo OA chính thức sắp ra mắt. Hiện tại bạn có thể nhắn Zalo trực tiếp cho Khánh Hà:</p>' +
+      '<a class="btn" style="background:var(--pine);color:#fff;" href="' + (SITE_CONFIG.links ? SITE_CONFIG.links.zaloPersonal : '#') + '" target="_blank" rel="noopener">Nhắn Zalo ngay</a>' +
+      '</div>';
+  }
+}
+
+/**
+ * Menu di động (hamburger) trong header — dùng ở tất cả các trang.
+ */
+function initMobileNav() {
+  var navToggle = document.getElementById('navToggle');
+  var mobileNav = document.getElementById('mobileNav');
+  if (!navToggle || !mobileNav) return;
+
+  navToggle.addEventListener('click', function () {
+    mobileNav.classList.toggle('open');
+  });
+}
+
+/**
+ * Icon tìm kiếm trên menu — dùng ở tất cả các trang.
+ * Bấm để mở ô nhập, gửi đi sẽ chuyển tới trang Sản phẩm kèm từ khoá (?q=...).
+ */
+function initHeaderSearch() {
+  var toggle = document.getElementById('searchToggle');
+  var box = document.getElementById('searchBox');
+  if (!toggle || !box) return;
+
+  toggle.addEventListener('click', function (e) {
+    e.preventDefault();
+    box.classList.toggle('open');
+    if (box.classList.contains('open')) {
+      var input = box.querySelector('input');
+      if (input) input.focus();
+    }
+  });
+
+  document.addEventListener('click', function (e) {
+    if (!box.contains(e.target) && e.target !== toggle && !toggle.contains(e.target)) {
+      box.classList.remove('open');
+      var input = box.querySelector('input');
+      if (input) input.blur();
+    }
+  });
+}
+
+/**
+ * Slideshow ở khối hero — chỉ có ở trang chủ. Tự chạy mỗi 4.5 giây,
+ * có nút mũi tên và chấm điều hướng để bấm chuyển thủ công.
+ */
+function initHeroSlideshow() {
+  var wrap = document.getElementById('heroSlideshow');
+  var dotsWrap = document.getElementById('slideDots');
+  var prevBtn = document.getElementById('slidePrev');
+  var nextBtn = document.getElementById('slideNext');
+  if (!wrap) return;
+
+  var slides = wrap.querySelectorAll('.slide');
+  if (!slides.length) return;
+
+  var current = 0;
+  var timer;
+
+  slides.forEach(function (_, i) {
+    var dot = document.createElement('button');
+    dot.className = 'slide-dot' + (i === 0 ? ' active' : '');
+    dot.setAttribute('aria-label', 'Xem ảnh ' + (i + 1));
+    dot.addEventListener('click', function () {
+      goTo(i);
+      resetTimer();
+    });
+    dotsWrap.appendChild(dot);
+  });
+
+  function goTo(index) {
+    slides[current].classList.remove('active');
+    dotsWrap.children[current].classList.remove('active');
+    current = (index + slides.length) % slides.length;
+    slides[current].classList.add('active');
+    dotsWrap.children[current].classList.add('active');
+  }
+
+  function resetTimer() {
+    clearInterval(timer);
+    timer = setInterval(function () {
+      goTo(current + 1);
+    }, 4500);
+  }
+
+  if (prevBtn) {
+    prevBtn.addEventListener('click', function () {
+      goTo(current - 1);
+      resetTimer();
+    });
+  }
+  if (nextBtn) {
+    nextBtn.addEventListener('click', function () {
+      goTo(current + 1);
+      resetTimer();
+    });
+  }
+
+  resetTimer();
+}
+
+/**
+ * Tabs "Không gian" (Góc bếp / Phòng khách / Ngoài trời) — chỉ có ở trang chủ.
+ */
+function initSpaceTabs() {
+  var tabButtons = document.querySelectorAll('.tab-btn');
+  if (!tabButtons.length) return;
+
+  tabButtons.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.tab-btn').forEach(function (b) {
+        b.classList.remove('active');
+      });
+      document.querySelectorAll('.tab-panel').forEach(function (p) {
+        p.classList.remove('active');
+      });
+      btn.classList.add('active');
+      var panel = document.getElementById('tab-' + btn.dataset.tab);
+      if (panel) panel.classList.add('active');
+    });
+  });
+}
+
+/**
+ * Bộ lọc + tìm kiếm sản phẩm — chỉ có ở trang Sản phẩm (san-pham.html).
+ * Danh mục và từ khoá tìm kiếm hoạt động cùng lúc (kết hợp AND).
+ * Gọi lại hàm này SAU KHI các nút filter + thẻ sản phẩm đã được render
+ * xong từ Firestore (xem initProductsPageData bên dưới).
+ */
+function initProductFilter() {
+  var filterButtons = document.querySelectorAll('.filter-btn');
+  var searchInput = document.getElementById('productSearch');
+  var cards = document.querySelectorAll('.prod-card');
+  if (!filterButtons.length && !searchInput) return;
+
+  var params = new URLSearchParams(window.location.search);
+  var catParam = params.get('cat');
+  var currentCategory = 'all';
+
+  function applyFilters() {
+    var query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+    cards.forEach(function (card) {
+      var matchesCategory = currentCategory === 'all' || card.dataset.category === currentCategory;
+      var nameEl = card.querySelector('h3');
+      var name = nameEl ? nameEl.textContent.toLowerCase() : '';
+      var matchesQuery = !query || name.indexOf(query) !== -1;
+      card.hidden = !(matchesCategory && matchesQuery);
+    });
+  }
+
+  filterButtons.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      filterButtons.forEach(function (b) {
+        b.classList.remove('active');
+      });
+      btn.classList.add('active');
+      currentCategory = btn.dataset.filter;
+      applyFilters();
+    });
+  });
+
+  // Nếu link dẫn tới có sẵn ?cat=... (bấm từ danh mục ở trang chủ) -> chọn đúng danh mục đó
+  if (catParam) {
+    var matchedBtn = document.querySelector('.filter-btn[data-filter="' + catParam + '"]');
+    if (matchedBtn) {
+      filterButtons.forEach(function (b) {
+        b.classList.remove('active');
+      });
+      matchedBtn.classList.add('active');
+      currentCategory = catParam;
+    }
+  }
+
+  if (searchInput) {
+    var q = params.get('q');
+    if (q) searchInput.value = q;
+    searchInput.addEventListener('input', applyFilters);
+  }
+
+  applyFilters();
+}
+
+/* =======================================================================
+   DỮ LIỆU FIRESTORE — danh mục & sản phẩm
+   ======================================================================= */
+
+var CATEGORY_ICON_PATHS = {
+  pot: '<path d="M4 9h16v2a7 7 0 0 1-7 7H11a7 7 0 0 1-7-7V9Z"/><path d="M8 9V6a4 4 0 0 1 8 0v3"/>',
+  socket: '<rect x="4" y="6" width="16" height="12" rx="2"/><path d="M4 11h16"/>',
+  shelf: '<rect x="4" y="4" width="16" height="6" rx="1"/><rect x="4" y="14" width="16" height="6" rx="1"/>',
+  bottle: '<path d="M6 4h12l-1 16H7L6 4Z"/><path d="M9 9h6"/>',
+  clock: '<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>',
+  awning: '<path d="M4 13a8 8 0 0 1 16 0"/><path d="M4 13h16v3a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3Z"/>',
+  box: '<path d="M21 8 12 3 3 8l9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/>',
+  lightbulb: '<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.7.6 1 1.3 1 2.1h5c0-.8.3-1.5 1-2.1A6 6 0 0 0 12 3Z"/>',
+  shirt: '<path d="M8 4 4 7l2 3 2-1v10h8V9l2 1 2-3-4-3-2 2h-4L8 4Z"/>',
+  scissors: '<circle cx="7" cy="6" r="2.5"/><circle cx="7" cy="18" r="2.5"/><path d="M8.6 7.6 20 18"/><path d="M20 6 8.6 16.4"/>',
+  gift: '<rect x="4" y="9" width="16" height="11" rx="1"/><path d="M4 9h16v4H4z"/><path d="M12 9v11"/><path d="M12 9c-1-3-5-4-5-1.5S9 9 12 9Z"/><path d="M12 9c1-3 5-4 5-1.5S15 9 12 9Z"/>',
+  wrench: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2-2 2.6-2.6Z"/>',
+  star: '<path d="m12 3 2.6 5.8 6.4.6-4.8 4.3 1.4 6.2L12 16.9 6.4 19.9l1.4-6.2L3 9.4l6.4-.6L12 3Z"/>',
+  heart: '<path d="M12 20.5S3.5 15 3.5 8.8A4.3 4.3 0 0 1 12 6.5a4.3 4.3 0 0 1 8.5 2.3C20.5 15 12 20.5 12 20.5Z"/>',
+  home: '<path d="M4 11 12 4l8 7"/><path d="M6 10v10h12V10"/><path d="M10 20v-6h4v6"/>',
+  truck: '<rect x="2" y="8" width="12" height="9" rx="1"/><path d="M14 11h4l3 3v3h-7z"/><circle cx="7" cy="18" r="1.6"/><circle cx="17.5" cy="18" r="1.6"/>',
+  umbrella: '<path d="M12 3a9 9 0 0 1 9 9H3a9 9 0 0 1 9-9Z"/><path d="M12 12v7a2 2 0 0 1-4 0"/>',
+  leaf: '<path d="M20 4C10 4 4 10 4 20c10 0 16-6 16-16Z"/><path d="M4 20 14 10"/>',
+  fan: '<circle cx="12" cy="12" r="1.6"/><path d="M12 12c0-4 2-7 5-7s3 4-1 6"/><path d="M12 12c-4 0-7-2-7-5s4-3 6 1"/><path d="M12 12c0 4-2 7-5 7s-3-4 1-6"/><path d="M12 12c4 0 7 2 7 5s-4 3-6-1"/>',
+  tv: '<rect x="3" y="5" width="18" height="12" rx="1.5"/><path d="M8 21h8M12 17v4"/>',
+  bed: '<path d="M3 19v-7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v7"/><path d="M3 15h18"/><path d="M7 12V8a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2"/>',
+  basket: '<path d="M4 9h16l-2 10H6L4 9Z"/><path d="M4 9 7 4h10l3 5"/><path d="M9 13v3M12 13v3M15 13v3"/>'
+};
+
+var PROD_THUMB_COLORS = ['var(--pine)', 'var(--pine-light)', '#8A4E27', 'var(--copper)'];
+
+// Bucket Firebase Storage của dự án — dùng để suy ra URL tải ảnh công khai
+// từ path lưu trong Firestore (vd: "products/abc.jpg" -> URL đầy đủ).
+var STORAGE_BUCKET = 'khanhha-web.firebasestorage.app';
+
+function storagePathToUrl(path) {
+  if (!path) return path;
+  if (/^https?:\/\//.test(path)) return path;
+  return 'https://firebasestorage.googleapis.com/v0/b/' + STORAGE_BUCKET + '/o/' + encodeURIComponent(path) + '?alt=media';
+}
+
+function categoryIconSvg(iconName, strokeWidth) {
+  var inner = CATEGORY_ICON_PATHS[iconName] || CATEGORY_ICON_PATHS.pot;
+  return '<svg viewBox="0 0 24 24" fill="none" stroke-width="' + (strokeWidth || 1.5) +
+    '" stroke-linecap="round" stroke-linejoin="round">' + inner + '</svg>';
+}
+
+function escapeHtml(str) {
+  var div = document.createElement('div');
+  div.textContent = str == null ? '' : String(str);
+  return div.innerHTML;
+}
+
+function formatPrice(n) {
+  return Number(n || 0).toLocaleString('vi-VN') + '₫';
+}
+
+async function fetchCategories() {
+  var snap = await getDocs(query(collection(db, 'categories'), orderBy('order')));
+  return snap.docs.map(function (d) { return d.data(); });
+}
+
+async function fetchProducts(opts) {
+  opts = opts || {};
+  var constraints = [where('isActive', '==', true)];
+  if (opts.featuredOnly) constraints.push(where('isFeatured', '==', true));
+  var snap = await getDocs(query(collection(db, 'products'), ...constraints));
+  return snap.docs.map(function (d) { return d.data(); });
+}
+
+function renderCategoryGrid(container, categories) {
+  if (!container) return;
+  container.innerHTML = categories.map(function (c) {
+    return '<a class="cat-card" href="san-pham.html?cat=' + encodeURIComponent(c.slug) + '">' +
+      categoryIconSvg(c.icon, 1.6) +
+      '<span>' + escapeHtml(c.name) + '</span></a>';
+  }).join('');
+}
+
+function renderCategoryFilterBar(container, categories) {
+  if (!container) return;
+  var html = '<button class="filter-btn active" data-filter="all">Tất cả</button>';
+  html += categories.map(function (c) {
+    return '<button class="filter-btn" data-filter="' + escapeHtml(c.slug) + '">' + escapeHtml(c.name) + '</button>';
+  }).join('');
+  container.innerHTML = html;
+}
+
+function renderProductGrid(container, products, categories) {
+  if (!container) return;
+
+  if (!products.length) {
+    container.innerHTML = '<p class="empty-state">Chưa có sản phẩm nào.</p>';
+    return;
+  }
+
+  var catMap = {};
+  categories.forEach(function (c) { catMap[c.slug] = c; });
+
+  container.innerHTML = products.map(function (p, i) {
+    var cat = catMap[p.category] || {};
+    var hasImage = p.images && p.images.length > 0;
+    var thumbStyle = hasImage
+      ? "background-image:url('" + storagePathToUrl(p.images[0]) + "');background-size:cover;background-position:center;"
+      : 'background:' + PROD_THUMB_COLORS[i % PROD_THUMB_COLORS.length] + ';';
+
+    var badge = '';
+    if (p.oldPrice) {
+      var pct = Math.round((p.oldPrice - p.price) / p.oldPrice * 100);
+      badge = '<span class="tag-sale">-' + pct + '%</span>';
+    } else if (p.stock === false) {
+      badge = '<span class="tag-outofstock">Hết hàng</span>';
+    }
+
+    var icon = hasImage ? '' : categoryIconSvg(cat.icon, 1.5);
+    var oldPriceHtml = p.oldPrice ? ' <span class="old">' + formatPrice(p.oldPrice) + '</span>' : '';
+
+    return '<div class="prod-card" data-category="' + escapeHtml(p.category) + '">' +
+      '<div class="prod-thumb" style="' + thumbStyle + '">' + badge + icon + '</div>' +
+      '<div class="prod-body"><span class="cat">' + escapeHtml(cat.name || '') + '</span>' +
+      '<h3>' + escapeHtml(p.name) + '</h3>' +
+      '<div class="price">' + formatPrice(p.price) + oldPriceHtml + '</div></div>' +
+      '</div>';
+  }).join('');
+}
+
+/**
+ * Trang chủ: danh mục (cat-grid) lấy từ categories, mục "Bán chạy" lấy
+ * sản phẩm có isFeatured: true.
+ */
+async function initHomepageData() {
+  var catGrid = document.getElementById('categoryGrid');
+  var featuredGrid = document.getElementById('featuredProductGrid');
+  if (!catGrid && !featuredGrid) return;
+
+  try {
+    var categories = await fetchCategories();
+    renderCategoryGrid(catGrid, categories);
+
+    if (featuredGrid) {
+      var featured = await fetchProducts({ featuredOnly: true });
+      renderProductGrid(featuredGrid, featured, categories);
+    }
+  } catch (err) {
+    console.error('Không tải được dữ liệu trang chủ:', err);
+  }
+}
+
+/**
+ * Trang Sản phẩm: bộ lọc danh mục + lưới sản phẩm đều lấy từ Firestore.
+ * Sau khi render xong DOM mới gọi initProductFilter() để gắn sự kiện lọc/tìm.
+ */
+async function initProductsPageData() {
+  var grid = document.getElementById('productGrid');
+  if (!grid) return;
+
+  var filterBar = document.getElementById('categoryFilterBar');
+
+  try {
+    var categories = await fetchCategories();
+    renderCategoryFilterBar(filterBar, categories);
+    var products = await fetchProducts();
+    renderProductGrid(grid, products, categories);
+  } catch (err) {
+    console.error('Không tải được danh sách sản phẩm:', err);
+    grid.innerHTML = '<p class="empty-state">Không tải được sản phẩm, vui lòng tải lại trang.</p>';
+  }
+
+  initProductFilter();
+}
+
+/* =======================================================================
+   FORM LIÊN HỆ — ghi thật vào collection "messages"
+   ======================================================================= */
+
+function initContactForm() {
+  var form = document.getElementById('contactForm');
+  if (!form) return;
+
+  var status = document.getElementById('contactFormStatus');
+  var submitBtn = form.querySelector('button[type="submit"]');
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+
+    var name = document.getElementById('name').value.trim();
+    var phone = document.getElementById('phone').value.trim();
+    var content = document.getElementById('message').value.trim();
+
+    if (!name || !phone || !content) {
+      if (status) {
+        status.textContent = 'Vui lòng nhập đầy đủ họ tên, số điện thoại và nội dung.';
+        status.className = 'form-status error';
+      }
+      return;
+    }
+
+    if (submitBtn) submitBtn.disabled = true;
+
+    addDoc(collection(db, 'messages'), {
+      name: name,
+      phone: phone,
+      content: content,
+      status: 'moi',
+      note: '',
+      createdAt: serverTimestamp()
+    }).then(function () {
+      form.reset();
+      if (status) {
+        status.textContent = 'Đã gửi, Khánh Hà sẽ liên hệ lại sớm.';
+        status.className = 'form-status success';
+      }
+    }).catch(function (err) {
+      console.error('Gửi tin nhắn thất bại:', err);
+      if (status) {
+        status.textContent = 'Có lỗi xảy ra, vui lòng thử lại hoặc nhắn Zalo trực tiếp.';
+        status.className = 'form-status error';
+      }
+    }).finally(function () {
+      if (submitBtn) submitBtn.disabled = false;
+    });
+  });
+}
