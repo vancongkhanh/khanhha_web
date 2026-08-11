@@ -40,6 +40,11 @@
   .nav-item svg{width:18px;height:18px;flex:none;stroke:currentColor;}
   .nav-item:hover{background:rgba(255,255,255,.06);}
   .nav-item.active{background:rgba(255,255,255,.1);border-left-color:var(--copper);color:#fff;}
+  .nav-count{
+    margin-left:auto;background:rgba(255,255,255,.14);color:#EAF1EE;font-size:10.5px;font-weight:700;
+    padding:1px 7px;border-radius:999px;
+  }
+  .nav-count-alert{background:var(--copper);color:#fff;}
   .nav-sub{display:flex;flex-direction:column;}
   .nav-sub-item{padding:8px 20px 8px 50px;font-size:13px;color:#C6D9D3;cursor:pointer;border-left:3px solid transparent;}
   .nav-sub-item:hover{color:#fff;}
@@ -84,6 +89,7 @@
   .prod-thumb-sm{width:40px;height:40px;border-radius:8px;flex:none;display:flex;align-items:center;justify-content:center;}
   .prod-thumb-sm svg{width:20px;height:20px;stroke:#fff;}
   .cell-name{display:flex;align-items:center;gap:12px;font-weight:500;}
+  .cell-toggle{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
   .badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;}
   .badge-ok{background:var(--ok-bg);color:var(--ok);}
   .badge-warn{background:var(--warn-bg);color:var(--warn);}
@@ -99,6 +105,19 @@
   }
   .filter-toolbar input{flex:1;min-width:180px;}
   .filter-toolbar input:focus,.filter-toolbar select:focus{outline:none;border-color:var(--copper);}
+
+  .pagination-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;flex-wrap:wrap;}
+  .page-size-select{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);}
+  .page-size-select select{padding:6px 10px;border-radius:8px;border:1.5px solid var(--border);font-size:13px;background:#fff;}
+  .pagination-controls{display:flex;align-items:center;gap:6px;}
+  .page-btn{
+    min-width:30px;height:30px;padding:0 8px;border-radius:8px;border:1px solid var(--border);background:#fff;
+    font-size:12.5px;font-weight:600;color:var(--ink);
+  }
+  .page-btn:hover:not(:disabled){border-color:var(--copper);color:var(--copper);}
+  .page-btn:disabled{opacity:.4;cursor:not-allowed;}
+  .page-btn.active{background:var(--pine);border-color:var(--pine);color:#fff;}
+  .page-info{font-size:12.5px;color:var(--muted);margin:0 4px;}
 
   /* Toggle switch */
   .switch{position:relative;width:38px;height:22px;flex:none;}
@@ -183,16 +202,21 @@
   .modal-foot{display:flex;justify-content:flex-end;gap:10px;padding:16px 24px;border-top:1px solid var(--border);}
 
   /* Upload ảnh sản phẩm */
-  .image-upload-row{display:flex;gap:10px;flex-wrap:wrap;}
+  .image-dropzone{
+    width:100%;min-height:120px;border-radius:12px;border:1.5px dashed var(--border);background:var(--bg);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+    color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;text-align:center;padding:16px;
+  }
+  .image-dropzone svg{width:26px;height:26px;stroke:var(--muted);}
+  .image-dropzone.drag-over{border-color:var(--copper);background:var(--copper-pale);color:var(--copper);}
+  .image-dropzone.drag-over svg{stroke:var(--copper);}
+  .image-dropzone.disabled{cursor:not-allowed;opacity:.6;}
+  .image-thumb-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;}
   .image-slot{
     width:76px;height:76px;border-radius:10px;background:var(--bg);border:1px solid var(--border);
     display:flex;align-items:center;justify-content:center;position:relative;flex:none;overflow:hidden;
   }
   .image-slot svg{width:22px;height:22px;stroke:#fff;}
-  .image-slot.add-slot{border:1.5px dashed var(--border);background:transparent;color:var(--muted);flex-direction:column;gap:4px;font-size:10.5px;cursor:pointer;}
-  .image-slot.add-slot svg{stroke:var(--muted);width:18px;height:18px;}
-  .image-slot.add-slot.drag-over{border-color:var(--copper);background:var(--copper-pale);color:var(--copper);}
-  .image-slot.add-slot.drag-over svg{stroke:var(--copper);}
   .image-slot .remove{position:absolute;top:3px;right:3px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;cursor:pointer;}
   .image-slot .remove svg{width:10px;height:10px;stroke:#fff;}
 
@@ -323,15 +347,17 @@
     <div class="nav-item" data-page="products">
       <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h16v2a7 7 0 0 1-7 7H11a7 7 0 0 1-7-7V9Z"/><path d="M8 9V6a4 4 0 0 1 8 0v3"/></svg>
       Sản phẩm
+      <span class="nav-count" id="navCountProducts">0</span>
     </div>
     <div class="nav-item" data-page="categories">
       <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>
       Danh mục
+      <span class="nav-count" id="navCountCategories">0</span>
     </div>
     <div class="nav-item" data-page="messages">
       <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H7l-3 3V5Z"/></svg>
       Hộp thư
-      <span style="margin-left:auto;background:var(--copper);color:#fff;font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:999px;">2</span>
+      <span class="nav-count nav-count-alert" id="navCountMessages">0</span>
     </div>
   </div>
 
@@ -403,6 +429,18 @@
           <thead><tr><th>Sản phẩm</th><th>Danh mục</th><th>Giá</th><th>Còn hàng</th><th>Bán chạy</th><th></th></tr></thead>
           <tbody id="productsTableBody"></tbody>
         </table>
+        <div class="pagination-bar">
+          <div class="page-size-select">
+            <label for="pfilter-pagesize">Số dòng/trang</label>
+            <select id="pfilter-pagesize">
+              <option value="10">10</option>
+              <option value="20">20</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </div>
+          <div class="pagination-controls" id="productsPagination"></div>
+        </div>
       </div>
     </div>
 
@@ -450,6 +488,11 @@
             <div class="form-field full">
               <label>Mô tả banner đầu trang</label>
               <textarea id="set-heroDesc">Khánh Hà chọn lọc đồ bếp, đồ điện gia dụng, kệ tủ inox và đồ nhựa bền chắc — mang sự gọn gàng, tiện lợi đến từng gia đình ở Phan Thiết.</textarea>
+            </div>
+            <div class="form-field">
+              <label>Số sản phẩm hiển thị ở mục "Bán chạy"</label>
+              <span class="hint">Nếu số sản phẩm đánh dấu Bán chạy nhiều hơn, trang chủ chỉ lấy số mới nhất theo giới hạn này.</span>
+              <input id="set-featuredLimit" type="number" min="1" max="20" value="8">
             </div>
           </div>
           <div class="save-bar"><button class="btn btn-outline" onclick="cancelSettings('appearance')">Huỷ</button><button class="btn btn-primary" onclick="saveSettingsAppearance()">Lưu thay đổi</button></div>

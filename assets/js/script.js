@@ -8,10 +8,13 @@
    cấu hình cửa hàng, danh mục, sản phẩm và ghi tin nhắn liên hệ.
    ===================================================================== */
 
-import { db } from './firebase-init.js';
+import { db, storage } from './firebase-init.js';
 import {
   collection, getDocs, getDoc, doc, query, where, orderBy, addDoc, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js';
+import {
+  ref, uploadBytes, getDownloadURL
+} from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-storage.js';
 
 /* ---------------------------------------------------------------------
    SITE_CONFIG — toàn bộ nội dung có thể thay đổi của website. Giá trị
@@ -122,6 +125,7 @@ document.addEventListener('DOMContentLoaded', function () {
   loadSiteConfig();
   initHomepageData();
   initProductsPageData();
+  initProductDetailPage();
 });
 
 /**
@@ -290,25 +294,72 @@ function initSpaceTabs() {
  * Gọi lại hàm này SAU KHI các nút filter + thẻ sản phẩm đã được render
  * xong từ Firestore (xem initProductsPageData bên dưới).
  */
+var PRODUCTS_PER_PAGE = 16;
+
 function initProductFilter() {
   var filterButtons = document.querySelectorAll('.filter-btn');
   var searchInput = document.getElementById('productSearch');
   var cards = document.querySelectorAll('.prod-card');
+  var grid = document.getElementById('productGrid');
+  var paginationEl = document.getElementById('productPagination');
   if (!filterButtons.length && !searchInput) return;
 
   var params = new URLSearchParams(window.location.search);
   var catParam = params.get('cat');
   var currentCategory = 'all';
+  var currentPage = 1;
 
   function applyFilters() {
-    var query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+    var query = searchInput ? removeDiacritics(searchInput.value.trim()) : '';
+    var matches = [];
+
     cards.forEach(function (card) {
       var matchesCategory = currentCategory === 'all' || card.dataset.category === currentCategory;
       var nameEl = card.querySelector('h3');
-      var name = nameEl ? nameEl.textContent.toLowerCase() : '';
+      var name = nameEl ? removeDiacritics(nameEl.textContent) : '';
       var matchesQuery = !query || name.indexOf(query) !== -1;
-      card.hidden = !(matchesCategory && matchesQuery);
+      var isMatch = matchesCategory && matchesQuery;
+      card.dataset.matches = isMatch ? '1' : '0';
+      if (isMatch) matches.push(card);
     });
+
+    var totalPages = Math.max(1, Math.ceil(matches.length / PRODUCTS_PER_PAGE));
+    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+
+    var startIdx = (currentPage - 1) * PRODUCTS_PER_PAGE;
+    var pageSet = matches.slice(startIdx, startIdx + PRODUCTS_PER_PAGE);
+
+    cards.forEach(function (card) {
+      card.hidden = pageSet.indexOf(card) === -1;
+    });
+
+    renderPagination(matches.length, totalPages);
+  }
+
+  function renderPagination(totalItems, totalPages) {
+    if (!paginationEl) return;
+    if (totalItems <= PRODUCTS_PER_PAGE) {
+      paginationEl.innerHTML = '';
+      return;
+    }
+    paginationEl.innerHTML =
+      '<button type="button" class="page-btn" id="pagePrevBtn">‹ Trước</button>' +
+      '<span class="page-info">Trang ' + currentPage + ' / ' + totalPages + '</span>' +
+      '<button type="button" class="page-btn" id="pageNextBtn">Sau ›</button>';
+
+    var prevBtn = document.getElementById('pagePrevBtn');
+    var nextBtn = document.getElementById('pageNextBtn');
+    prevBtn.disabled = currentPage <= 1;
+    nextBtn.disabled = currentPage >= totalPages;
+    prevBtn.addEventListener('click', function () { goToPage(currentPage - 1); });
+    nextBtn.addEventListener('click', function () { goToPage(currentPage + 1); });
+  }
+
+  function goToPage(page) {
+    currentPage = page;
+    applyFilters();
+    if (grid) grid.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   filterButtons.forEach(function (btn) {
@@ -318,6 +369,7 @@ function initProductFilter() {
       });
       btn.classList.add('active');
       currentCategory = btn.dataset.filter;
+      currentPage = 1;
       applyFilters();
     });
   });
@@ -337,7 +389,10 @@ function initProductFilter() {
   if (searchInput) {
     var q = params.get('q');
     if (q) searchInput.value = q;
-    searchInput.addEventListener('input', applyFilters);
+    searchInput.addEventListener('input', function () {
+      currentPage = 1;
+      applyFilters();
+    });
   }
 
   applyFilters();
@@ -396,6 +451,15 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+function removeDiacritics(str) {
+  return String(str || '')
+    .normalize('NFD')
+    .replace(new RegExp('[̀-ͯ]', 'g'), '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase();
+}
+
 function formatPrice(n) {
   return Number(n || 0).toLocaleString('vi-VN') + '₫';
 }
@@ -410,7 +474,7 @@ async function fetchProducts(opts) {
   var constraints = [where('isActive', '==', true)];
   if (opts.featuredOnly) constraints.push(where('isFeatured', '==', true));
   var snap = await getDocs(query(collection(db, 'products'), ...constraints));
-  return snap.docs.map(function (d) { return d.data(); });
+  return snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
 }
 
 function renderCategoryGrid(container, categories) {
@@ -460,12 +524,12 @@ function renderProductGrid(container, products, categories) {
     var icon = hasImage ? '' : categoryIconSvg(cat.icon, 1.5);
     var oldPriceHtml = p.oldPrice ? ' <span class="old">' + formatPrice(p.oldPrice) + '</span>' : '';
 
-    return '<div class="prod-card" data-category="' + escapeHtml(p.category) + '">' +
+    return '<a class="prod-card" href="san-pham-chi-tiet.html?id=' + encodeURIComponent(p.id) + '" data-category="' + escapeHtml(p.category) + '">' +
       '<div class="prod-thumb" style="' + thumbStyle + '">' + badge + icon + '</div>' +
       '<div class="prod-body"><span class="cat">' + escapeHtml(cat.name || '') + '</span>' +
       '<h3>' + escapeHtml(p.name) + '</h3>' +
       '<div class="price">' + formatPrice(p.price) + oldPriceHtml + '</div></div>' +
-      '</div>';
+      '</a>';
   }).join('');
 }
 
@@ -483,8 +547,22 @@ async function initHomepageData() {
     renderCategoryGrid(catGrid, categories);
 
     if (featuredGrid) {
+      var featuredLimit = 8;
+      try {
+        var settingsSnap = await getDoc(doc(db, 'settings', 'main'));
+        if (settingsSnap.exists()) {
+          var s = settingsSnap.data();
+          if (s.appearance && s.appearance.featuredLimit) featuredLimit = Number(s.appearance.featuredLimit) || 8;
+        }
+      } catch (e) { /* dùng mặc định 8 nếu không đọc được settings */ }
+
       var featured = await fetchProducts({ featuredOnly: true });
-      renderProductGrid(featuredGrid, featured, categories);
+      featured.sort(function (a, b) {
+        var at = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : 0;
+        var bt = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : 0;
+        return bt - at;
+      });
+      renderProductGrid(featuredGrid, featured.slice(0, featuredLimit), categories);
     }
   } catch (err) {
     console.error('Không tải được dữ liệu trang chủ:', err);
@@ -515,8 +593,150 @@ async function initProductsPageData() {
 }
 
 /* =======================================================================
+   TRANG CHI TIẾT SẢN PHẨM (san-pham-chi-tiet.html?id=...)
+   ======================================================================= */
+
+async function initProductDetailPage() {
+  var root = document.getElementById('productDetailRoot');
+  if (!root) return;
+
+  var params = new URLSearchParams(window.location.search);
+  var id = params.get('id');
+  if (!id) {
+    root.innerHTML = '<p class="empty-state">Không tìm thấy sản phẩm.</p>';
+    return;
+  }
+
+  try {
+    var snap = await getDoc(doc(db, 'products', id));
+    if (!snap.exists() || snap.data().isActive === false) {
+      root.innerHTML = '<p class="empty-state">Sản phẩm không tồn tại hoặc đã ngừng bán.</p>';
+      return;
+    }
+
+    var product = Object.assign({ id: snap.id }, snap.data());
+    var categories = await fetchCategories();
+    var cat = categories.find(function (c) { return c.slug === product.category; }) || {};
+
+    document.title = product.name + ' – Cửa hàng Khánh Hà';
+    updateProductBreadcrumb(product, cat);
+    renderProductDetail(root, product, cat);
+
+    var allProducts = await fetchProducts();
+    var related = allProducts
+      .filter(function (p) { return p.category === product.category && p.id !== product.id; })
+      .slice(0, 4);
+
+    var relatedSection = document.getElementById('relatedSection');
+    var relatedGrid = document.getElementById('relatedProductGrid');
+    if (related.length && relatedSection && relatedGrid) {
+      renderProductGrid(relatedGrid, related, categories);
+      relatedSection.style.display = '';
+    }
+  } catch (err) {
+    console.error('Không tải được sản phẩm:', err);
+    root.innerHTML = '<p class="empty-state">Có lỗi khi tải sản phẩm, vui lòng tải lại trang.</p>';
+  }
+}
+
+function updateProductBreadcrumb(product, cat) {
+  var el = document.getElementById('productBreadcrumb');
+  if (!el) return;
+  el.innerHTML = '<a href="index.html">Trang chủ</a> / <a href="san-pham.html">Sản phẩm</a> / ' +
+    (cat.slug ? '<a href="san-pham.html?cat=' + encodeURIComponent(cat.slug) + '">' + escapeHtml(cat.name) + '</a> / ' : '') +
+    '<span>' + escapeHtml(product.name) + '</span>';
+}
+
+function renderProductDetail(root, product, cat) {
+  var galleryImages = (product.images || []).map(storagePathToUrl);
+  var hasImage = galleryImages.length > 0;
+  var mainStyle = hasImage
+    ? "background-image:url('" + galleryImages[0] + "');background-size:cover;background-position:center;"
+    : 'background:' + PROD_THUMB_COLORS[0] + ';';
+  var iconHtml = hasImage ? '' : categoryIconSvg(cat.icon, 1.3);
+
+  var badge = '';
+  if (product.oldPrice) {
+    var pct = Math.round((product.oldPrice - product.price) / product.oldPrice * 100);
+    badge = '<span class="tag-sale">-' + pct + '%</span>';
+  } else if (product.stock === false) {
+    badge = '<span class="tag-outofstock">Hết hàng</span>';
+  }
+
+  var thumbsHtml = galleryImages.length > 1
+    ? '<div class="detail-gallery-thumbs" id="detailThumbs">' + galleryImages.map(function (url, i) {
+        return '<div class="detail-thumb' + (i === 0 ? ' active' : '') + '" style="background-image:url(\'' + url + '\')" data-index="' + i + '"></div>';
+      }).join('') + '</div>'
+    : '';
+
+  var oldPriceHtml = product.oldPrice ? ' <span class="old">' + formatPrice(product.oldPrice) + '</span>' : '';
+  var stockHtml = product.stock === false
+    ? '<span class="badge-stock out">Hết hàng</span>'
+    : '<span class="badge-stock in">Còn hàng</span>';
+  var descHtml = product.description ? escapeHtml(product.description) : 'Đang cập nhật mô tả cho sản phẩm này.';
+
+  root.innerHTML =
+    '<div class="detail-gallery">' +
+      '<div class="detail-gallery-main" id="detailMainImage" style="' + mainStyle + '">' + badge + iconHtml + '</div>' +
+      thumbsHtml +
+    '</div>' +
+    '<div class="detail-info">' +
+      '<span class="cat">' + escapeHtml(cat.name || '') + '</span>' +
+      '<h1>' + escapeHtml(product.name) + '</h1>' +
+      stockHtml +
+      '<div class="detail-price">' + formatPrice(product.price) + oldPriceHtml + '</div>' +
+      '<p class="detail-desc">' + descHtml + '</p>' +
+      '<div class="detail-cta">' +
+        '<a class="btn btn-primary" id="detailZaloBtn" href="' + (SITE_CONFIG.links.zaloPersonal || 'https://zalo.me/0898999039') + '" target="_blank" rel="noopener">Nhắn Zalo đặt hàng</a>' +
+        '<a class="btn btn-outline" id="detailCallBtn" href="' + (SITE_CONFIG.store.phoneHref || 'tel:0898999039') + '">Gọi ngay</a>' +
+      '</div>' +
+    '</div>';
+
+  if (galleryImages.length > 1) {
+    document.querySelectorAll('#detailThumbs .detail-thumb').forEach(function (thumb) {
+      thumb.addEventListener('click', function () {
+        document.querySelectorAll('#detailThumbs .detail-thumb').forEach(function (t) { t.classList.remove('active'); });
+        thumb.classList.add('active');
+        var idx = Number(thumb.dataset.index);
+        document.getElementById('detailMainImage').style.backgroundImage = "url('" + galleryImages[idx] + "')";
+      });
+    });
+  }
+}
+
+/* =======================================================================
    FORM LIÊN HỆ — ghi thật vào collection "messages"
    ======================================================================= */
+
+function compressContactImage(file) {
+  return new Promise(function (resolve, reject) {
+    var img = new Image();
+    var url = URL.createObjectURL(file);
+    img.onload = function () {
+      URL.revokeObjectURL(url);
+      var maxW = 1000;
+      var scale = Math.min(1, maxW / img.width);
+      var canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(img.width * scale));
+      canvas.height = Math.max(1, Math.round(img.height * scale));
+      var ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(function (blob) {
+        if (blob) resolve(blob); else reject(new Error('Không nén được ảnh'));
+      }, 'image/jpeg', 0.8);
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('Không đọc được ảnh')); };
+    img.src = url;
+  });
+}
+
+function uploadContactImage(file) {
+  return compressContactImage(file).then(function (blob) {
+    var path = 'messages/' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.jpg';
+    var storageRef = ref(storage, path);
+    return uploadBytes(storageRef, blob).then(function () { return getDownloadURL(storageRef); });
+  });
+}
 
 function initContactForm() {
   var form = document.getElementById('contactForm');
@@ -524,6 +744,15 @@ function initContactForm() {
 
   var status = document.getElementById('contactFormStatus');
   var submitBtn = form.querySelector('button[type="submit"]');
+  var imageInput = document.getElementById('contactImage');
+  var imagePreviewName = document.getElementById('contactImagePreviewName');
+
+  if (imageInput) {
+    imageInput.addEventListener('change', function () {
+      var file = imageInput.files[0];
+      if (imagePreviewName) imagePreviewName.textContent = file ? 'Đã chọn: ' + file.name : '';
+    });
+  }
 
   form.addEventListener('submit', function (e) {
     e.preventDefault();
@@ -542,15 +771,28 @@ function initContactForm() {
 
     if (submitBtn) submitBtn.disabled = true;
 
-    addDoc(collection(db, 'messages'), {
-      name: name,
-      phone: phone,
-      content: content,
-      status: 'moi',
-      note: '',
-      createdAt: serverTimestamp()
+    var imageFile = imageInput && imageInput.files[0] ? imageInput.files[0] : null;
+    if (imageFile && status) {
+      status.textContent = 'Đang gửi ảnh...';
+      status.className = 'form-status';
+    }
+
+    var uploadPromise = imageFile ? uploadContactImage(imageFile) : Promise.resolve(null);
+
+    uploadPromise.then(function (imageUrl) {
+      var payload = {
+        name: name,
+        phone: phone,
+        content: content,
+        status: 'moi',
+        note: '',
+        createdAt: serverTimestamp()
+      };
+      if (imageUrl) payload.imageUrl = imageUrl;
+      return addDoc(collection(db, 'messages'), payload);
     }).then(function () {
       form.reset();
+      if (imagePreviewName) imagePreviewName.textContent = '';
       if (status) {
         status.textContent = 'Đã gửi, Khánh Hà sẽ liên hệ lại sớm.';
         status.className = 'form-status success';

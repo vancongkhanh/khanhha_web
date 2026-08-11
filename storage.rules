@@ -20,5 +20,13 @@ service firebase.storage {
       allow read: if true;
       allow write: if isAdmin() && request.resource.size < 3 * 1024 * 1024;
     }
+
+    // Ảnh khách gửi kèm form Liên hệ — không cần đăng nhập, giới hạn chặt
+    // để tránh bị lạm dụng (chỉ ảnh, tối đa 2MB/file).
+    match /messages/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.resource.size < 2 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
   }
 }
