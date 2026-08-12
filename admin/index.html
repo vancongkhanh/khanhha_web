@@ -195,6 +195,25 @@
     .msg-top{flex-direction:column;align-items:flex-start;gap:2px;}
     .msg-top .time{font-size:11px;}
     .filter-toolbar input,.filter-toolbar select{flex:1 1 100%;min-width:0;}
+    .cat-admin-grid{grid-template-columns:1fr;}
+  }
+
+  /* ===== Bảng sản phẩm dạng thẻ trên di động ===== */
+  @media (max-width:760px){
+    .responsive-table thead{display:none;}
+    .responsive-table, .responsive-table tbody, .responsive-table tr, .responsive-table td{display:block;width:100%;}
+    .responsive-table tr{border-bottom:1px solid var(--border);padding:14px 16px;}
+    .responsive-table tr:last-child{border-bottom:none;}
+    .responsive-table td{border:none;padding:5px 0;}
+    .responsive-table td[data-label]::before{
+      content:attr(data-label);display:block;font-size:10.5px;font-weight:700;text-transform:uppercase;
+      letter-spacing:.04em;color:var(--muted);margin-bottom:3px;
+    }
+    .responsive-table td[data-label="Sản phẩm"]::before,
+    .responsive-table td[data-label="Thao tác"]::before{display:none;}
+    .responsive-table td[data-label="Sản phẩm"]{padding-top:0;}
+    .responsive-table td[data-label="Thao tác"]{padding-top:10px;}
+    .responsive-table .row-actions{justify-content:flex-end;}
   }
 
   /* ===== Modal (thêm/sửa/xoá) ===== */
@@ -301,6 +320,20 @@
   .login-card .form-field input:focus{outline:none;border-color:var(--copper);}
   .login-error{font-size:12.5px;color:var(--warn);min-height:1em;text-align:center;}
   .login-card .btn{width:100%;justify-content:center;margin-top:4px;}
+  .login-card .btn:disabled{opacity:.7;cursor:not-allowed;}
+
+  /* ===== Loading dữ liệu lần đầu ===== */
+  .app-loading{
+    display:none;position:fixed;inset:0;background:var(--bg);z-index:250;
+    flex-direction:column;align-items:center;justify-content:center;gap:14px;
+  }
+  .app-loading.open{display:flex;}
+  .app-loading p{font-size:13.5px;color:var(--muted);font-weight:600;}
+  .app-loading-spinner{
+    width:36px;height:36px;border-radius:50%;border:3px solid var(--border);
+    border-top-color:var(--copper);animation:app-spin .8s linear infinite;
+  }
+  @keyframes app-spin{to{transform:rotate(360deg);}}
   .password-field{position:relative;}
   .password-field input{padding-right:40px;}
   .password-toggle{
@@ -340,8 +373,14 @@
       <span>Ghi nhớ tài khoản</span>
     </label>
     <p class="login-error" id="loginError"></p>
-    <button class="btn btn-primary" type="submit">Đăng nhập</button>
+    <button class="btn btn-primary" type="submit" id="loginSubmitBtn">Đăng nhập</button>
   </form>
+</div>
+
+<!-- Đang tải dữ liệu lần đầu sau khi đăng nhập -->
+<div class="app-loading" id="appLoading">
+  <div class="app-loading-spinner"></div>
+  <p>Đang tải dữ liệu...</p>
 </div>
 
 <!-- Sidebar -->
@@ -446,7 +485,7 @@
         </select>
       </div>
       <div class="card">
-        <table>
+        <table class="responsive-table">
           <thead><tr><th>Sản phẩm</th><th>Danh mục</th><th>Giá</th><th>Còn hàng</th><th>Bán chạy</th><th></th></tr></thead>
           <tbody id="productsTableBody"></tbody>
         </table>

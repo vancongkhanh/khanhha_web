@@ -153,6 +153,7 @@ onAuthStateChanged(auth, function (user) {
     loginError.textContent = '';
     setAppVisible(true);
     document.getElementById('topbarUserEmail').textContent = user.email || '';
+    showAppLoading();
     startApp();
   } else {
     if (user) {
@@ -160,8 +161,18 @@ onAuthStateChanged(auth, function (user) {
       signOut(auth);
     }
     setAppVisible(false);
+    hideAppLoading();
   }
 });
+
+function showAppLoading() {
+  var el = document.getElementById('appLoading');
+  if (el) el.classList.add('open');
+}
+function hideAppLoading() {
+  var el = document.getElementById('appLoading');
+  if (el) el.classList.remove('open');
+}
 
 var REMEMBER_EMAIL_KEY = 'khanhha_admin_email';
 
@@ -174,10 +185,14 @@ if (savedEmail) {
 document.getElementById('loginForm').addEventListener('submit', function (e) {
   e.preventDefault();
   var loginError = document.getElementById('loginError');
+  var submitBtn = document.getElementById('loginSubmitBtn');
   loginError.textContent = '';
   var email = document.getElementById('login-email').value.trim();
   var password = document.getElementById('login-password').value;
   var remember = document.getElementById('login-remember').checked;
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Đang đăng nhập...';
 
   setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence)
     .then(function () { return signInWithEmailAndPassword(auth, email, password); })
@@ -187,6 +202,10 @@ document.getElementById('loginForm').addEventListener('submit', function (e) {
     })
     .catch(function () {
       loginError.textContent = 'Sai email hoặc mật khẩu.';
+    })
+    .finally(function () {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Đăng nhập';
     });
 });
 
@@ -203,12 +222,19 @@ document.getElementById('logoutBtn').addEventListener('click', function () {
 });
 
 function startApp() {
-  if (appStarted) return;
+  if (appStarted) {
+    hideAppLoading();
+    return;
+  }
   appStarted = true;
-  listenCategories();
-  listenProducts();
-  listenMessages();
-  loadSettings();
+  Promise.all([
+    listenCategories(),
+    listenProducts(),
+    listenMessages(),
+    loadSettings()
+  ]).then(function () {
+    hideAppLoading();
+  });
 }
 
 /* =======================================================================
@@ -216,31 +242,55 @@ function startApp() {
    ======================================================================= */
 
 function listenCategories() {
-  onSnapshot(query(collection(db, 'categories'), orderBy('order')), function (snap) {
-    categoriesCache = snap.docs.map(function (d) { return d.data(); });
-    renderCategories();
-    populateCategoryFilterOptions();
-    renderProducts();
-    updateDashboardStats();
-  }, function (err) { console.error('Lỗi tải danh mục:', err); showToast('Không tải được danh mục'); });
+  return new Promise(function (resolveFirstLoad) {
+    var firstLoad = true;
+    onSnapshot(query(collection(db, 'categories'), orderBy('order')), function (snap) {
+      categoriesCache = snap.docs.map(function (d) { return d.data(); });
+      renderCategories();
+      populateCategoryFilterOptions();
+      renderProducts();
+      updateDashboardStats();
+      if (firstLoad) { firstLoad = false; resolveFirstLoad(); }
+    }, function (err) {
+      console.error('Lỗi tải danh mục:', err);
+      showToast('Không tải được danh mục');
+      if (firstLoad) { firstLoad = false; resolveFirstLoad(); }
+    });
+  });
 }
 
 function listenProducts() {
-  onSnapshot(query(collection(db, 'products'), orderBy('createdAt', 'desc')), function (snap) {
-    productsCache = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
-    renderProducts();
-    renderCategories();
-    updateDashboardStats();
-  }, function (err) { console.error('Lỗi tải sản phẩm:', err); showToast('Không tải được sản phẩm'); });
+  return new Promise(function (resolveFirstLoad) {
+    var firstLoad = true;
+    onSnapshot(query(collection(db, 'products'), orderBy('createdAt', 'desc')), function (snap) {
+      productsCache = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+      renderProducts();
+      renderCategories();
+      updateDashboardStats();
+      if (firstLoad) { firstLoad = false; resolveFirstLoad(); }
+    }, function (err) {
+      console.error('Lỗi tải sản phẩm:', err);
+      showToast('Không tải được sản phẩm');
+      if (firstLoad) { firstLoad = false; resolveFirstLoad(); }
+    });
+  });
 }
 
 function listenMessages() {
-  onSnapshot(query(collection(db, 'messages'), orderBy('createdAt', 'desc')), function (snap) {
-    messagesCache = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
-    renderMessages();
-    renderRecentMessages();
-    updateDashboardStats();
-  }, function (err) { console.error('Lỗi tải tin nhắn:', err); showToast('Không tải được hộp thư'); });
+  return new Promise(function (resolveFirstLoad) {
+    var firstLoad = true;
+    onSnapshot(query(collection(db, 'messages'), orderBy('createdAt', 'desc')), function (snap) {
+      messagesCache = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+      renderMessages();
+      renderRecentMessages();
+      updateDashboardStats();
+      if (firstLoad) { firstLoad = false; resolveFirstLoad(); }
+    }, function (err) {
+      console.error('Lỗi tải tin nhắn:', err);
+      showToast('Không tải được hộp thư');
+      if (firstLoad) { firstLoad = false; resolveFirstLoad(); }
+    });
+  });
 }
 
 /* =======================================================================
@@ -403,12 +453,12 @@ function renderProducts() {
       : 'background:' + color;
     var iconSvg = hasImage ? '' : '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.5">' + (CATEGORY_ICONS[categoryIconKey(p.category)] || '') + '</svg>';
     return '<tr>' +
-      '<td><div class="cell-name"><div class="prod-thumb-sm" style="' + thumbStyle + '">' + iconSvg + '</div>' + escapeHtml(p.name) + '</div></td>' +
-      '<td>' + escapeHtml(categoryName(p.category)) + '</td>' +
-      '<td>' + formatVND(p.price) + '</td>' +
-      '<td><label class="switch"><input type="checkbox" ' + (p.stock ? 'checked' : '') + ' onchange="adminToggleProductField(\'' + p.id + '\',\'stock\',this.checked)"><span class="slider"></span></label></td>' +
-      '<td><label class="switch"><input type="checkbox" ' + (p.isFeatured ? 'checked' : '') + ' onchange="adminToggleProductField(\'' + p.id + '\',\'featured\',this.checked)"><span class="slider"></span></label></td>' +
-      '<td><div class="row-actions">' +
+      '<td data-label="Sản phẩm"><div class="cell-name"><div class="prod-thumb-sm" style="' + thumbStyle + '">' + iconSvg + '</div>' + escapeHtml(p.name) + '</div></td>' +
+      '<td data-label="Danh mục">' + escapeHtml(categoryName(p.category)) + '</td>' +
+      '<td data-label="Giá">' + formatVND(p.price) + '</td>' +
+      '<td data-label="Còn hàng"><label class="switch"><input type="checkbox" ' + (p.stock ? 'checked' : '') + ' onchange="adminToggleProductField(\'' + p.id + '\',\'stock\',this.checked)"><span class="slider"></span></label></td>' +
+      '<td data-label="Bán chạy"><label class="switch"><input type="checkbox" ' + (p.isFeatured ? 'checked' : '') + ' onchange="adminToggleProductField(\'' + p.id + '\',\'featured\',this.checked)"><span class="slider"></span></label></td>' +
+      '<td data-label="Thao tác"><div class="row-actions">' +
       '<button class="icon-btn" title="Sửa" onclick="adminOpenProductModal(\'edit\',\'' + p.id + '\')">' + editIcon() + '</button>' +
       '<button class="icon-btn" title="Xoá" onclick="adminOpenDeleteConfirm(\'product\',\'' + p.id + '\')">' + trashIcon() + '</button>' +
       '</div></td></tr>';
@@ -924,7 +974,7 @@ document.getElementById('modalOverlay').addEventListener('click', function (e) {
    ======================================================================= */
 
 function loadSettings() {
-  getDoc(doc(db, 'settings', 'main')).then(function (snap) {
+  return getDoc(doc(db, 'settings', 'main')).then(function (snap) {
     settingsCache = snap.exists() ? snap.data() : {};
     populateSettingsForms(settingsCache);
   }).catch(function (err) {
