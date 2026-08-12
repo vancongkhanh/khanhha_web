@@ -109,6 +109,7 @@ function loadSiteConfig() {
         }
         applySiteConfig();
         initZaloFollow();
+        initHeroSlideshow();
       }
     } catch (err) {
       console.error('Không tải được cấu hình cửa hàng:', err);
@@ -214,18 +215,35 @@ function initHeaderSearch() {
  * Slideshow ở khối hero — chỉ có ở trang chủ. Tự chạy mỗi 4.5 giây,
  * có nút mũi tên và chấm điều hướng để bấm chuyển thủ công.
  */
-function initHeroSlideshow() {
-  var wrap = document.getElementById('heroSlideshow');
-  var dotsWrap = document.getElementById('slideDots');
-  var prevBtn = document.getElementById('slidePrev');
-  var nextBtn = document.getElementById('slideNext');
-  if (!wrap) return;
+/**
+ * Dựng lại các slide từ SITE_CONFIG.appearance.heroSlides (nếu chủ shop đã
+ * cấu hình trong Admin). Nếu chưa có dữ liệu, giữ nguyên các slide tĩnh
+ * đã viết sẵn trong HTML làm phương án dự phòng.
+ */
+function renderHeroSlidesFromConfig(wrap) {
+  var slidesData = SITE_CONFIG.appearance && SITE_CONFIG.appearance.heroSlides;
+  if (!slidesData || !slidesData.length) return false;
 
+  wrap.innerHTML = slidesData.map(function (s, i) {
+    var captionHtml = s.caption ? '<span class="slide-caption">' + escapeHtml(s.caption) + '</span>' : '';
+    return '<div class="slide' + (i === 0 ? ' active' : '') + '">' +
+      '<div class="slide-photo"><img src="' + storagePathToUrl(s.image) + '" alt="' + escapeHtml(s.caption || '') + '"></div>' +
+      captionHtml +
+      '</div>';
+  }).join('');
+  return true;
+}
+
+var heroSlideState = null;
+
+function setupHeroSlides(wrap, dotsWrap) {
   var slides = wrap.querySelectorAll('.slide');
   if (!slides.length) return;
 
+  if (heroSlideState && heroSlideState.timer) clearInterval(heroSlideState.timer);
+  dotsWrap.innerHTML = '';
+
   var current = 0;
-  var timer;
 
   slides.forEach(function (_, i) {
     var dot = document.createElement('button');
@@ -247,26 +265,38 @@ function initHeroSlideshow() {
   }
 
   function resetTimer() {
-    clearInterval(timer);
-    timer = setInterval(function () {
+    clearInterval(heroSlideState.timer);
+    heroSlideState.timer = setInterval(function () {
       goTo(current + 1);
     }, 4500);
   }
 
-  if (prevBtn) {
-    prevBtn.addEventListener('click', function () {
-      goTo(current - 1);
-      resetTimer();
-    });
-  }
-  if (nextBtn) {
-    nextBtn.addEventListener('click', function () {
-      goTo(current + 1);
-      resetTimer();
-    });
-  }
-
+  heroSlideState = {
+    timer: null,
+    next: function () { goTo(current + 1); resetTimer(); },
+    prev: function () { goTo(current - 1); resetTimer(); }
+  };
   resetTimer();
+}
+
+function initHeroSlideshow() {
+  var wrap = document.getElementById('heroSlideshow');
+  var dotsWrap = document.getElementById('slideDots');
+  var prevBtn = document.getElementById('slidePrev');
+  var nextBtn = document.getElementById('slideNext');
+  if (!wrap) return;
+
+  renderHeroSlidesFromConfig(wrap);
+  setupHeroSlides(wrap, dotsWrap);
+
+  if (prevBtn && !prevBtn.dataset.wired) {
+    prevBtn.dataset.wired = '1';
+    prevBtn.addEventListener('click', function () { if (heroSlideState) heroSlideState.prev(); });
+  }
+  if (nextBtn && !nextBtn.dataset.wired) {
+    nextBtn.dataset.wired = '1';
+    nextBtn.addEventListener('click', function () { if (heroSlideState) heroSlideState.next(); });
+  }
 }
 
 /**

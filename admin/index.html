@@ -256,6 +256,15 @@
   .image-slot .remove{position:absolute;top:3px;right:3px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;cursor:pointer;}
   .image-slot .remove svg{width:10px;height:10px;stroke:#fff;}
 
+  /* Danh sách ảnh banner trang chủ */
+  .hero-slides-list{display:flex;flex-direction:column;gap:10px;margin-top:12px;}
+  .hero-slide-item{display:flex;gap:12px;align-items:center;padding:8px;border:1px solid var(--border);border-radius:10px;background:#fff;}
+  .hero-slide-item .thumb{width:72px;height:48px;border-radius:8px;background-size:cover;background-position:center;flex:none;background-color:var(--bg);}
+  .hero-slide-item input{
+    flex:1;min-width:0;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);font-size:13px;background:#fff;
+  }
+  .hero-slide-item input:focus{outline:none;border-color:var(--copper);}
+
   /* Icon picker (danh mục) */
   .icon-picker{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;}
   .icon-option{
@@ -576,6 +585,22 @@
               <label>Số sản phẩm hiển thị ở mục "Bán chạy"</label>
               <span class="hint">Nếu số sản phẩm đánh dấu Bán chạy nhiều hơn, trang chủ chỉ lấy số mới nhất theo giới hạn này.</span>
               <input id="set-featuredLimit" type="number" min="1" max="20" value="8">
+            </div>
+            <div class="form-field full">
+              <label>Ảnh banner trang chủ (slideshow)</label>
+              <span class="hint">
+                Nên dùng ảnh chụp ngang (không phải ảnh dọc), tỷ lệ khoảng 3:2 — ví dụ 1200×800px trở lên — để không bị cắt xấu khi hiển thị.
+                Không cần chỉnh sửa hay nén trước, hệ thống tự nén khi tải lên. Nên dùng 3–6 ảnh, tối đa 8 ảnh để slideshow không quá dài.
+              </span>
+              <div class="image-dropzone" id="hero-image-drop" onclick="document.getElementById('hero-image-file').click()"
+                ondragover="event.preventDefault();this.classList.add('drag-over')"
+                ondragleave="this.classList.remove('drag-over')"
+                ondrop="adminHandleHeroImageDrop(event)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+                <span>Kéo ảnh vào đây hoặc bấm để chọn — có thể chọn nhiều ảnh cùng lúc</span>
+              </div>
+              <input type="file" id="hero-image-file" accept="image/*" multiple style="display:none;">
+              <div class="hero-slides-list" id="hero-slides-list"></div>
             </div>
           </div>
           <div class="save-bar"><button class="btn btn-outline" onclick="cancelSettings('appearance')">Huỷ</button><button class="btn btn-primary" onclick="saveSettingsAppearance()">Lưu thay đổi</button></div>

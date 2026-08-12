@@ -1036,6 +1036,8 @@ function populateSettingsForms(s) {
   document.getElementById('set-heroTitle2').value = hero.titleLine2 || '';
   document.getElementById('set-heroDesc').value = hero.description || '';
   document.getElementById('set-featuredLimit').value = appearance.featuredLimit || 8;
+  heroSlidesDraft = (appearance.heroSlides || []).map(function (s) { return Object.assign({}, s); });
+  renderHeroSlidesEditor();
 
   document.getElementById('set-address').value = store.address || '';
   document.getElementById('set-addressNote').value = store.addressNote || '';
@@ -1076,6 +1078,76 @@ document.getElementById('logoFileInput').addEventListener('change', function (e)
   });
 });
 
+/* =======================================================================
+   ẢNH BANNER TRANG CHỦ (slideshow, nhiều ảnh)
+   ======================================================================= */
+
+var heroSlidesDraft = [];
+var HERO_SLIDES_MAX = 8;
+
+function renderHeroSlidesEditor() {
+  var list = document.getElementById('hero-slides-list');
+  var dropzone = document.getElementById('hero-image-drop');
+  if (!list) return;
+
+  list.innerHTML = heroSlidesDraft.map(function (s, idx) {
+    return '<div class="hero-slide-item">' +
+      '<div class="thumb" style="background-image:url(\'' + storagePathToUrl(s.image) + '\')"></div>' +
+      '<input type="text" placeholder="Chú thích (không bắt buộc)" value="' + escapeHtml(s.caption || '') + '" oninput="adminUpdateHeroCaption(' + idx + ',this.value)">' +
+      '<button type="button" class="icon-btn" title="Xoá ảnh" onclick="adminRemoveHeroSlide(' + idx + ')">' + trashIcon() + '</button>' +
+      '</div>';
+  }).join('');
+
+  if (dropzone) {
+    var reachedMax = heroSlidesDraft.length >= HERO_SLIDES_MAX;
+    dropzone.classList.toggle('disabled', reachedMax);
+    var label = dropzone.querySelector('span');
+    if (label) {
+      label.textContent = reachedMax
+        ? 'Đã đạt tối đa ' + HERO_SLIDES_MAX + ' ảnh — xoá bớt để thêm ảnh khác'
+        : 'Kéo ảnh vào đây hoặc bấm để chọn — có thể chọn nhiều ảnh cùng lúc';
+    }
+  }
+}
+
+function updateHeroCaption(idx, value) {
+  if (heroSlidesDraft[idx]) heroSlidesDraft[idx].caption = value;
+}
+
+function removeHeroSlide(idx) {
+  heroSlidesDraft.splice(idx, 1);
+  renderHeroSlidesEditor();
+}
+
+function uploadHeroImageFile(file) {
+  if (heroSlidesDraft.length >= HERO_SLIDES_MAX) { showToast('Tối đa ' + HERO_SLIDES_MAX + ' ảnh banner'); return; }
+  if (!file || file.type.indexOf('image/') !== 0) { showToast('Vui lòng chọn file ảnh'); return; }
+  showToast('Đang tải ảnh lên...');
+  uploadToStorage('branding', file).then(function (url) {
+    heroSlidesDraft.push({ image: url, caption: '' });
+    renderHeroSlidesEditor();
+    showToast('Đã tải ảnh lên — nhớ bấm Lưu thay đổi');
+  }).catch(function (err) {
+    console.error(err);
+    showToast('Tải ảnh thất bại, thử lại');
+  });
+}
+
+function handleHeroImageDrop(e) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  var files = e.dataTransfer.files;
+  if (!files || !files.length) return;
+  Array.prototype.forEach.call(files, uploadHeroImageFile);
+}
+
+document.getElementById('hero-image-file').addEventListener('change', function (e) {
+  var files = e.target.files;
+  var fileList = files ? Array.prototype.slice.call(files) : [];
+  e.target.value = '';
+  fileList.forEach(uploadHeroImageFile);
+});
+
 function deriveMessengerLink(fbUrl) {
   if (!fbUrl) return '';
   try {
@@ -1108,7 +1180,8 @@ function saveSettingsAppearance() {
       titleLine2: document.getElementById('set-heroTitle2').value.trim(),
       description: document.getElementById('set-heroDesc').value.trim()
     },
-    featuredLimit: Number(document.getElementById('set-featuredLimit').value) || 8
+    featuredLimit: Number(document.getElementById('set-featuredLimit').value) || 8,
+    heroSlides: heroSlidesDraft
   };
   updateDoc(doc(db, 'settings', 'main'), { appearance: appearance }).then(function () {
     settingsCache = Object.assign({}, settingsCache, { appearance: appearance });
@@ -1175,6 +1248,9 @@ window.adminGoToProductPage = goToProductPage;
 window.adminGoToMessagePage = goToMessagePage;
 window.adminRemoveProductImage = removeProductImage;
 window.adminHandleProductImageDrop = handleProductImageDrop;
+window.adminUpdateHeroCaption = updateHeroCaption;
+window.adminRemoveHeroSlide = removeHeroSlide;
+window.adminHandleHeroImageDrop = handleHeroImageDrop;
 window.adminOpenCategoryModal = openCategoryModal;
 window.adminSelectIconOption = selectIconOption;
 window.adminSaveCategory = saveCategory;
