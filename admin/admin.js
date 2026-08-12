@@ -480,6 +480,14 @@ document.getElementById('pfilter-stock').addEventListener('change', function () 
   productPage = 1;
   renderProducts();
 });
+
+function goToOutOfStock() {
+  showPage('products');
+  productFilters.stock = 'out';
+  document.getElementById('pfilter-stock').value = 'out';
+  productPage = 1;
+  renderProducts();
+}
 document.getElementById('pfilter-featured').addEventListener('change', function () {
   productFilters.featured = this.value;
   productPage = 1;
@@ -1149,6 +1157,7 @@ window.adminCloseDrawer = closeDrawer;
 window.adminSetMessageStatus = setMessageStatus;
 window.adminSaveMessageNote = saveMessageNote;
 window.showPage = showPage;
+window.adminGoToOutOfStock = goToOutOfStock;
 window.saveSettingsAppearance = saveSettingsAppearance;
 window.saveSettingsStore = saveSettingsStore;
 window.saveSettingsLinks = saveSettingsLinks;

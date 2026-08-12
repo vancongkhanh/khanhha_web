@@ -79,6 +79,8 @@
   .stat-card .label{font-size:12.5px;color:var(--muted);margin-bottom:6px;}
   .stat-card .value{font-size:26px;font-weight:600;font-family:'Fraunces',serif;color:var(--pine);}
   .stat-card .value.alert{color:var(--warn);}
+  .stat-link{cursor:pointer;transition:border-color .15s,transform .15s;}
+  .stat-link:hover{border-color:var(--copper);transform:translateY(-2px);}
   .section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
   .section-head p{font-size:13px;color:var(--muted);margin-top:2px;}
   .btn{
@@ -449,10 +451,10 @@
     <!-- ===== Dashboard ===== -->
     <div class="page active" id="page-dashboard">
       <div class="stat-grid">
-        <div class="card stat-card"><div class="label">Tổng sản phẩm</div><div class="value">42</div></div>
-        <div class="card stat-card"><div class="label">Hết hàng</div><div class="value alert">3</div></div>
-        <div class="card stat-card"><div class="label">Danh mục</div><div class="value">6</div></div>
-        <div class="card stat-card"><div class="label">Tin nhắn mới</div><div class="value alert">2</div></div>
+        <div class="card stat-card stat-link" onclick="showPage('products')"><div class="label">Tổng sản phẩm</div><div class="value">42</div></div>
+        <div class="card stat-card stat-link" onclick="adminGoToOutOfStock()"><div class="label">Hết hàng</div><div class="value alert">3</div></div>
+        <div class="card stat-card stat-link" onclick="showPage('categories')"><div class="label">Danh mục</div><div class="value">6</div></div>
+        <div class="card stat-card stat-link" onclick="showPage('messages')"><div class="label">Tin nhắn mới</div><div class="value alert">2</div></div>
       </div>
 
       <div class="card" style="padding:22px;">
