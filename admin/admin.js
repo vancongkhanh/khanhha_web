@@ -503,6 +503,7 @@ function toggleProductField(id, field, value) {
   var firestoreField = field === 'featured' ? 'isFeatured' : 'stock';
   var payload = { updatedAt: serverTimestamp() };
   payload[firestoreField] = value;
+  showToast('Đang cập nhật...');
   updateDoc(doc(db, 'products', id), payload).then(function () {
     showToast(field === 'stock' ? 'Đã cập nhật tình trạng hàng' : 'Đã cập nhật hiển thị "Bán chạy"');
   }).catch(function (err) {
@@ -549,7 +550,7 @@ function openProductModal(mode, id) {
     '<div class="image-thumb-row" id="pf-image-row"></div>' +
     '<p class="hint" style="margin-top:6px;">Tối đa 4 ảnh, tự động nén trước khi tải lên.</p></div>' +
     '</div></div>' +
-    '<div class="modal-foot"><button class="btn btn-outline" onclick="adminCloseModal()">Huỷ</button><button class="btn btn-primary" onclick="adminSaveProduct(' + (product ? "'" + product.id + "'" : 'null') + ')">Lưu sản phẩm</button></div>';
+    '<div class="modal-foot"><button class="btn btn-outline" onclick="adminCloseModal()">Huỷ</button><button class="btn btn-primary" id="pf-save-btn" onclick="adminSaveProduct(' + (product ? "'" + product.id + "'" : 'null') + ',this)">Lưu sản phẩm</button></div>';
 
   renderProductImageSlots();
   formatNumberInput(document.getElementById('pf-price'));
@@ -658,7 +659,7 @@ document.getElementById('pf-image-file').addEventListener('change', function (e)
   uploadProductImageFile(file);
 });
 
-function saveProduct(id) {
+function saveProduct(id, btn) {
   var name = document.getElementById('pf-name').value.trim();
   if (!name) { showToast('Vui lòng nhập tên sản phẩm'); return; }
 
@@ -684,12 +685,14 @@ function saveProduct(id) {
     promise = addDoc(collection(db, 'products'), data);
   }
 
+  if (btn) { btn.disabled = true; btn.textContent = 'Đang lưu...'; }
   promise.then(function () {
     showToast(id ? 'Đã lưu thay đổi sản phẩm' : 'Đã thêm sản phẩm mới');
     closeModal();
   }).catch(function (err) {
     console.error(err);
     showToast('Lưu sản phẩm thất bại');
+    if (btn) { btn.disabled = false; btn.textContent = 'Lưu sản phẩm'; }
   });
 }
 
@@ -730,7 +733,7 @@ function openCategoryModal(mode, slug) {
     '<div class="form-field full"><label>Thứ tự hiển thị</label><input id="cf-order" type="number" value="' + (cat ? cat.order : (categoriesCache.length + 1)) + '"></div>' +
     '<div class="form-field full"><label>Chọn icon</label><div class="icon-picker" id="iconPicker">' + iconOptions + '</div></div>' +
     '</div></div>' +
-    '<div class="modal-foot"><button class="btn btn-outline" onclick="adminCloseModal()">Huỷ</button><button class="btn btn-primary" onclick="adminSaveCategory(' + (cat ? "'" + cat.slug + "'" : 'null') + ')">Lưu danh mục</button></div>';
+    '<div class="modal-foot"><button class="btn btn-outline" onclick="adminCloseModal()">Huỷ</button><button class="btn btn-primary" onclick="adminSaveCategory(' + (cat ? "'" + cat.slug + "'" : 'null') + ',this)">Lưu danh mục</button></div>';
 
   openModal();
 }
@@ -740,7 +743,7 @@ function selectIconOption(el) {
   el.classList.add('selected');
 }
 
-function saveCategory(slug) {
+function saveCategory(slug, btn) {
   var name = document.getElementById('cf-name').value.trim();
   if (!name) { showToast('Vui lòng nhập tên danh mục'); return; }
   var order = Number(document.getElementById('cf-order').value) || 1;
@@ -755,12 +758,14 @@ function saveCategory(slug) {
     promise = setDoc(doc(db, 'categories', newSlug), { slug: newSlug, name: name, order: order, icon: icon });
   }
 
+  if (btn) { btn.disabled = true; btn.textContent = 'Đang lưu...'; }
   promise.then(function () {
     showToast(slug ? 'Đã lưu thay đổi danh mục' : 'Đã thêm danh mục mới');
     closeModal();
   }).catch(function (err) {
     console.error(err);
     showToast('Lưu danh mục thất bại');
+    if (btn) { btn.disabled = false; btn.textContent = 'Lưu danh mục'; }
   });
 }
 
@@ -786,7 +791,7 @@ function openDeleteConfirm(type, id) {
 
   var deleteBtn = productCount > 0
     ? '<button class="btn" disabled style="background:var(--warn);color:#fff;opacity:.4;cursor:not-allowed;">Xoá</button>'
-    : '<button class="btn" style="background:var(--warn);color:#fff;" onclick="adminConfirmDelete(\'' + type + '\',\'' + id + '\')">Xoá</button>';
+    : '<button class="btn" style="background:var(--warn);color:#fff;" onclick="adminConfirmDelete(\'' + type + '\',\'' + id + '\',this)">Xoá</button>';
 
   var panel = document.getElementById('modalPanel');
   panel.className = 'modal-panel modal-sm';
@@ -803,8 +808,9 @@ function openDeleteConfirm(type, id) {
   openModal();
 }
 
-function confirmDelete(type, id) {
+function confirmDelete(type, id, btn) {
   var collectionName = type === 'product' ? 'products' : (type === 'category' ? 'categories' : 'messages');
+  if (btn) { btn.disabled = true; btn.textContent = 'Đang xoá...'; }
   deleteDoc(doc(db, collectionName, id)).then(function () {
     showToast('Đã xoá ' + DELETE_TYPE_LABELS[type]);
     closeModal();
@@ -812,6 +818,7 @@ function confirmDelete(type, id) {
   }).catch(function (err) {
     console.error(err);
     showToast('Xoá thất bại');
+    if (btn) { btn.disabled = false; btn.textContent = 'Xoá'; }
   });
 }
 
@@ -943,7 +950,7 @@ function openMessageDetail(id) {
     '</div></div>' +
     '<div style="margin-top:14px;"><label style="font-size:12.5px;font-weight:600;">Ghi chú nội bộ (khách không thấy)</label>' +
     '<textarea id="msg-note" style="width:100%;margin-top:6px;padding:10px 12px;border-radius:8px;border:1.5px solid var(--border);font-size:13.5px;min-height:80px;">' + escapeHtml(m.note || '') + '</textarea>' +
-    '<button class="btn btn-outline btn-sm" style="margin-top:8px;" onclick="adminSaveMessageNote(\'' + m.id + '\')">Lưu ghi chú</button></div>' +
+    '<button class="btn btn-outline btn-sm" style="margin-top:8px;" onclick="adminSaveMessageNote(\'' + m.id + '\',this)">Lưu ghi chú</button></div>' +
     '</div>' +
     '<div class="drawer-foot">' +
     '<a class="btn btn-outline" style="flex:1;text-align:center;" href="' + telHref + '">📞 Gọi ngay</a>' +
@@ -958,6 +965,7 @@ function closeDrawer() { document.getElementById('drawerOverlay').classList.remo
 document.getElementById('drawerOverlay').addEventListener('click', function (e) { if (e.target === this) closeDrawer(); });
 
 function setMessageStatus(id, status) {
+  showToast('Đang cập nhật...');
   updateDoc(doc(db, 'messages', id), { status: status }).then(function () {
     openMessageDetail(id);
     showToast(status === 'moi' ? 'Đã đánh dấu Mới' : 'Đã đánh dấu Đã liên hệ');
@@ -967,13 +975,16 @@ function setMessageStatus(id, status) {
   });
 }
 
-function saveMessageNote(id) {
+function saveMessageNote(id, btn) {
   var note = document.getElementById('msg-note').value;
+  if (btn) { btn.disabled = true; btn.textContent = 'Đang lưu...'; }
   updateDoc(doc(db, 'messages', id), { note: note }).then(function () {
     showToast('Đã lưu ghi chú');
   }).catch(function (err) {
     console.error(err);
     showToast('Lưu ghi chú thất bại');
+  }).finally(function () {
+    if (btn) { btn.disabled = false; btn.textContent = 'Lưu ghi chú'; }
   });
 }
 
@@ -1359,7 +1370,7 @@ document.getElementById('set-showShipping').addEventListener('change', function 
   document.getElementById('set-showShippingLabel').textContent = this.checked ? 'Đang bật' : 'Đang tắt';
 });
 
-function saveSettingsAppearance() {
+function saveSettingsAppearance(btn) {
   var appearance = {
     logo: pendingLogoUrl || (settingsCache && settingsCache.appearance && settingsCache.appearance.logo) || '',
     storeName: document.getElementById('set-storeName').value.trim(),
@@ -1377,14 +1388,16 @@ function saveSettingsAppearance() {
       return Object.assign({}, sp, { bullets: (sp.bullets || []).filter(function (b) { return b.trim(); }) });
     })
   };
+  if (btn) { btn.disabled = true; btn.textContent = 'Đang lưu...'; }
   updateDoc(doc(db, 'settings', 'main'), { appearance: appearance }).then(function () {
     settingsCache = Object.assign({}, settingsCache, { appearance: appearance });
     pendingLogoUrl = null;
     showToast('Đã lưu Giao diện');
-  }).catch(function (err) { console.error(err); showToast('Lưu thất bại'); });
+  }).catch(function (err) { console.error(err); showToast('Lưu thất bại'); })
+    .finally(function () { if (btn) { btn.disabled = false; btn.textContent = 'Lưu thay đổi'; } });
 }
 
-function saveSettingsStore() {
+function saveSettingsStore(btn) {
   var store = {
     address: document.getElementById('set-address').value.trim(),
     addressNote: document.getElementById('set-addressNote').value.trim(),
@@ -1394,13 +1407,15 @@ function saveSettingsStore() {
     hotlineLabel: document.getElementById('set-hotline').value.trim(),
     showShippingBanner: document.getElementById('set-showShipping').checked
   };
+  if (btn) { btn.disabled = true; btn.textContent = 'Đang lưu...'; }
   updateDoc(doc(db, 'settings', 'main'), { store: store }).then(function () {
     settingsCache = Object.assign({}, settingsCache, { store: store });
     showToast('Đã lưu Thông tin cửa hàng');
-  }).catch(function (err) { console.error(err); showToast('Lưu thất bại'); });
+  }).catch(function (err) { console.error(err); showToast('Lưu thất bại'); })
+    .finally(function () { if (btn) { btn.disabled = false; btn.textContent = 'Lưu thay đổi'; } });
 }
 
-function saveSettingsLinks() {
+function saveSettingsLinks(btn) {
   var links = {
     facebook: document.getElementById('set-facebook').value.trim(),
     messenger: document.getElementById('set-messenger').value.trim(),
@@ -1411,10 +1426,12 @@ function saveSettingsLinks() {
     },
     googleMapsEmbed: document.getElementById('set-mapsEmbed').value.trim()
   };
+  if (btn) { btn.disabled = true; btn.textContent = 'Đang lưu...'; }
   updateDoc(doc(db, 'settings', 'main'), { links: links }).then(function () {
     settingsCache = Object.assign({}, settingsCache, { links: links });
     showToast('Đã lưu Liên kết');
-  }).catch(function (err) { console.error(err); showToast('Lưu thất bại'); });
+  }).catch(function (err) { console.error(err); showToast('Lưu thất bại'); })
+    .finally(function () { if (btn) { btn.disabled = false; btn.textContent = 'Lưu thay đổi'; } });
 }
 
 /* =======================================================================
