@@ -245,8 +245,9 @@
   .tab-panel .visual svg{width:120px;height:120px;stroke:var(--copper-light);}
   .tab-panel .visual.has-photo{
     background:transparent;position:relative;overflow:hidden;padding:0;
+    min-height:0;aspect-ratio:4/3;
   }
-  .tab-panel .visual.has-photo .slideshow{min-height:260px;}
+  .tab-panel .visual.has-photo .slideshow{min-height:0;height:100%;}
   .tab-panel .visual.has-photo .slide-nav{width:32px;height:32px;}
   .tab-panel .visual.has-photo .slide-nav svg{width:14px;height:14px;}
   .tab-panel .info h3{font-size:24px;margin-bottom:10px;}
