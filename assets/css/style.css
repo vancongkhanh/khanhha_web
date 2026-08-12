@@ -264,7 +264,11 @@
     position:relative;overflow:hidden;
   }
   .tab-panel .visual svg{width:120px;height:120px;stroke:var(--copper-light);}
-  .visual-skeleton{position:absolute;inset:0;background:rgba(255,255,255,.08);animation:skeletonPulse 1.3s ease-in-out infinite;z-index:1;}
+  .visual-skeleton{position:absolute;inset:0;background:var(--sand);z-index:1;}
+  .visual-skeleton::before{
+    content:'';position:absolute;inset:0;background:rgba(31,59,44,.14);
+    animation:skeletonPulse 1.3s ease-in-out infinite;
+  }
   .visual-skeleton.hide{display:none;}
   .tab-panel .visual.has-photo{
     background:var(--sand);position:relative;overflow:hidden;padding:0;
