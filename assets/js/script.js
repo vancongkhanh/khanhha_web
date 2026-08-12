@@ -115,6 +115,11 @@ function loadSiteConfig() {
       }
     } catch (err) {
       console.error('Không tải được cấu hình cửa hàng:', err);
+    } finally {
+      // Dù thành công, không có dữ liệu hay lỗi, đến đây coi như đã xong lượt
+      // tải đầu — ẩn lớp nhấp nháy dự phòng (icon tĩnh sẽ lộ ra nếu khu vực
+      // đó chưa được thay bằng ảnh thật).
+      document.querySelectorAll('.visual-skeleton').forEach(function (el) { el.classList.add('hide'); });
     }
     return SITE_CONFIG;
   })();
@@ -132,13 +137,6 @@ document.addEventListener('DOMContentLoaded', function () {
   initHomepageData(configPromise);
   initProductsPageData();
   initProductDetailPage();
-
-  // Phòng trường hợp không tải được cấu hình (mất mạng...), tự bỏ hiệu ứng
-  // nhấp nháy sau vài giây để không bị "treo" loading mãi — icon tĩnh có
-  // sẵn trong HTML sẽ hiện ra thay thế.
-  setTimeout(function () {
-    document.querySelectorAll('.visual-skeleton').forEach(function (el) { el.classList.add('hide'); });
-  }, 3000);
 });
 
 /**
