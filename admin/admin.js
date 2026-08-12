@@ -1039,6 +1039,10 @@ function populateSettingsForms(s) {
   heroSlidesDraft = (appearance.heroSlides || []).map(function (s) { return Object.assign({}, s); });
   renderHeroSlidesEditor();
 
+  spacesDraft = (appearance.spaces && appearance.spaces.length ? appearance.spaces : DEFAULT_SPACES)
+    .map(function (sp) { return Object.assign({}, sp, { bullets: (sp.bullets || []).slice(), images: (sp.images || []).slice() }); });
+  renderSpacesEditor();
+
   document.getElementById('set-address').value = store.address || '';
   document.getElementById('set-addressNote').value = store.addressNote || '';
   document.getElementById('set-hoursWeekday').value = store.hoursWeekday || '';
@@ -1148,6 +1152,193 @@ document.getElementById('hero-image-file').addEventListener('change', function (
   fileList.forEach(uploadHeroImageFile);
 });
 
+/* =======================================================================
+   MỤC "GỢI Ý KHÔNG GIAN" (danh sách khu vực trên trang chủ)
+   ======================================================================= */
+
+var spacesDraft = [];
+
+var DEFAULT_SPACES = [
+  {
+    id: 'bep', tabLabel: 'Góc bếp', title: 'Góc bếp gọn gàng, đủ đầy',
+    description: 'Bộ nồi inox, kệ treo và hộp đựng gia vị giúp bếp nhà bạn ngăn nắp mà vẫn tiện lấy đồ mỗi ngày.',
+    bullets: ['Bộ nồi inox 3 đáy', 'Kệ gia vị treo tường', 'Ống đũa & giá úp chén inox'],
+    ctaText: 'Xem sản phẩm góc bếp', ctaLink: 'san-pham.html?cat=bep', images: []
+  },
+  {
+    id: 'phongkhach', tabLabel: 'Phòng khách', title: 'Phòng khách ấm cúng',
+    description: 'Tủ nhựa nhiều tầng và móc treo gọn giúp phòng khách luôn sạch sẽ, đón khách bất cứ lúc nào.',
+    bullets: ['Tủ nhựa 4–5 tầng', 'Cây móc treo đa năng', 'Ghế nhựa xếp gọn'],
+    ctaText: 'Xem sản phẩm phòng khách', ctaLink: 'san-pham.html?cat=nhua', images: []
+  },
+  {
+    id: 'bancong', tabLabel: 'Ban công & ngoài trời', title: 'Ban công & ngoài trời thoáng mát',
+    description: 'Sào phơi inox, ghế xếp và bàn nhỏ gọn chịu nắng, chịu gió — hợp với khí hậu biển Phan Thiết.',
+    bullets: ['Sào phơi inox 304', 'Ghế xếp gọn ngoài trời', 'Bàn nhựa mini đa năng'],
+    ctaText: 'Xem sản phẩm ngoài trời', ctaLink: 'san-pham.html?cat=ngoaitroi', images: []
+  }
+];
+
+function slugifySpaceId(label, usedIds) {
+  var base = removeDiacritics(label || 'khu-vuc').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'khu-vuc';
+  var id = base, n = 2;
+  while (usedIds.indexOf(id) !== -1) { id = base + '-' + n; n++; }
+  return id;
+}
+
+function upDownIcon(dir) {
+  return dir < 0
+    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>'
+    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>';
+}
+
+function renderSpacesEditor() {
+  var container = document.getElementById('spaces-list');
+  if (!container) return;
+
+  container.innerHTML = spacesDraft.map(function (sp, idx) {
+    var bulletsHtml = (sp.bullets || []).map(function (b, bi) {
+      return '<div class="space-bullet-row">' +
+        '<input type="text" value="' + escapeHtml(b) + '" oninput="adminUpdateSpaceBullet(' + idx + ',' + bi + ',this.value)">' +
+        '<button type="button" class="icon-btn" title="Xoá dòng" onclick="adminRemoveSpaceBullet(' + idx + ',' + bi + ')">' + trashIcon() + '</button>' +
+        '</div>';
+    }).join('');
+
+    var imagesHtml = (sp.images || []).map(function (img, ii) {
+      return '<div class="hero-slide-item">' +
+        '<div class="thumb" style="background-image:url(\'' + storagePathToUrl(img) + '\')"></div>' +
+        '<span class="hint" style="flex:1;">Ảnh ' + (ii + 1) + '</span>' +
+        '<button type="button" class="icon-btn" title="Xoá ảnh" onclick="adminRemoveSpaceImage(' + idx + ',' + ii + ')">' + trashIcon() + '</button>' +
+        '</div>';
+    }).join('');
+
+    return '<div class="space-item">' +
+      '<div class="space-item-head">' +
+        '<strong>Khu vực ' + (idx + 1) + (sp.tabLabel ? ' — ' + escapeHtml(sp.tabLabel) : '') + '</strong>' +
+        '<div class="space-item-actions">' +
+          '<button type="button" class="icon-btn" title="Chuyển lên"' + (idx === 0 ? ' disabled' : '') + ' onclick="adminMoveSpace(' + idx + ',-1)">' + upDownIcon(-1) + '</button>' +
+          '<button type="button" class="icon-btn" title="Chuyển xuống"' + (idx === spacesDraft.length - 1 ? ' disabled' : '') + ' onclick="adminMoveSpace(' + idx + ',1)">' + upDownIcon(1) + '</button>' +
+          '<button type="button" class="icon-btn" title="Xoá khu vực" onclick="adminRemoveSpace(' + idx + ')">' + trashIcon() + '</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="form-grid" style="margin-top:10px;">' +
+        '<div class="form-field"><label>Tên tab</label><input type="text" value="' + escapeHtml(sp.tabLabel || '') + '" oninput="adminUpdateSpaceField(' + idx + ',\'tabLabel\',this.value)"></div>' +
+        '<div class="form-field"><label>Tiêu đề</label><input type="text" value="' + escapeHtml(sp.title || '') + '" oninput="adminUpdateSpaceField(' + idx + ',\'title\',this.value)"></div>' +
+        '<div class="form-field full"><label>Mô tả</label><textarea oninput="adminUpdateSpaceField(' + idx + ',\'description\',this.value)">' + escapeHtml(sp.description || '') + '</textarea></div>' +
+        '<div class="form-field"><label>Chữ trên nút</label><input type="text" value="' + escapeHtml(sp.ctaText || '') + '" oninput="adminUpdateSpaceField(' + idx + ',\'ctaText\',this.value)"></div>' +
+        '<div class="form-field"><label>Đường dẫn khi bấm nút</label><input type="text" value="' + escapeHtml(sp.ctaLink || '') + '" oninput="adminUpdateSpaceField(' + idx + ',\'ctaLink\',this.value)"></div>' +
+        '<div class="form-field full">' +
+          '<label>Danh sách gạch đầu dòng</label>' +
+          '<div class="space-bullets">' + bulletsHtml + '</div>' +
+          '<button type="button" class="btn btn-outline btn-sm" style="margin-top:8px;" onclick="adminAddSpaceBullet(' + idx + ')">+ Thêm dòng</button>' +
+        '</div>' +
+        '<div class="form-field full">' +
+          '<label>Ảnh cho khu vực này</label>' +
+          '<div class="image-dropzone" id="space-image-drop-' + idx + '" onclick="document.getElementById(\'space-image-file-' + idx + '\').click()" ' +
+            'ondragover="event.preventDefault();this.classList.add(\'drag-over\')" ondragleave="this.classList.remove(\'drag-over\')" ' +
+            'ondrop="adminHandleSpaceImageDrop(event,' + idx + ')">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>' +
+            '<span>Kéo ảnh vào đây hoặc bấm để chọn — có thể chọn nhiều ảnh</span>' +
+          '</div>' +
+          '<input type="file" id="space-image-file-' + idx + '" accept="image/*" multiple style="display:none;">' +
+          '<div class="hero-slides-list">' + imagesHtml + '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  spacesDraft.forEach(function (sp, idx) {
+    var input = document.getElementById('space-image-file-' + idx);
+    if (!input) return;
+    input.addEventListener('change', function (e) {
+      var files = e.target.files;
+      var fileList = files ? Array.prototype.slice.call(files) : [];
+      e.target.value = '';
+      fileList.forEach(function (f) { uploadSpaceImageFile(idx, f); });
+    });
+  });
+}
+
+function updateSpaceField(idx, field, value) {
+  if (spacesDraft[idx]) spacesDraft[idx][field] = value;
+  if (field === 'tabLabel') {
+    var head = document.querySelectorAll('.space-item-head strong')[idx];
+    if (head) head.textContent = 'Khu vực ' + (idx + 1) + (value ? ' — ' + value : '');
+  }
+}
+
+function addSpace() {
+  var usedIds = spacesDraft.map(function (s) { return s.id; });
+  spacesDraft.push({
+    id: slugifySpaceId('khu vuc moi', usedIds), tabLabel: 'Khu vực mới', title: '', description: '',
+    bullets: [], ctaText: '', ctaLink: '', images: []
+  });
+  renderSpacesEditor();
+}
+
+function removeSpace(idx) {
+  if (!confirm('Xoá khu vực này khỏi mục "Gợi ý không gian"?')) return;
+  spacesDraft.splice(idx, 1);
+  renderSpacesEditor();
+}
+
+function moveSpace(idx, dir) {
+  var target = idx + dir;
+  if (target < 0 || target >= spacesDraft.length) return;
+  var tmp = spacesDraft[idx];
+  spacesDraft[idx] = spacesDraft[target];
+  spacesDraft[target] = tmp;
+  renderSpacesEditor();
+}
+
+function addSpaceBullet(idx) {
+  if (!spacesDraft[idx]) return;
+  spacesDraft[idx].bullets = spacesDraft[idx].bullets || [];
+  spacesDraft[idx].bullets.push('');
+  renderSpacesEditor();
+}
+
+function updateSpaceBullet(idx, bi, value) {
+  if (spacesDraft[idx] && spacesDraft[idx].bullets) spacesDraft[idx].bullets[bi] = value;
+}
+
+function removeSpaceBullet(idx, bi) {
+  if (spacesDraft[idx] && spacesDraft[idx].bullets) {
+    spacesDraft[idx].bullets.splice(bi, 1);
+    renderSpacesEditor();
+  }
+}
+
+function uploadSpaceImageFile(idx, file) {
+  if (!file || file.type.indexOf('image/') !== 0) { showToast('Vui lòng chọn file ảnh'); return; }
+  if (!spacesDraft[idx]) return;
+  showToast('Đang tải ảnh lên...');
+  uploadToStorage('branding', file).then(function (url) {
+    spacesDraft[idx].images = spacesDraft[idx].images || [];
+    spacesDraft[idx].images.push(url);
+    renderSpacesEditor();
+    showToast('Đã tải ảnh lên — nhớ bấm Lưu thay đổi');
+  }).catch(function (err) {
+    console.error(err);
+    showToast('Tải ảnh thất bại, thử lại');
+  });
+}
+
+function removeSpaceImage(idx, ii) {
+  if (spacesDraft[idx] && spacesDraft[idx].images) {
+    spacesDraft[idx].images.splice(ii, 1);
+    renderSpacesEditor();
+  }
+}
+
+function handleSpaceImageDrop(e, idx) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  var files = e.dataTransfer.files;
+  if (!files || !files.length) return;
+  Array.prototype.forEach.call(files, function (f) { uploadSpaceImageFile(idx, f); });
+}
+
 function deriveMessengerLink(fbUrl) {
   if (!fbUrl) return '';
   try {
@@ -1181,7 +1372,10 @@ function saveSettingsAppearance() {
       description: document.getElementById('set-heroDesc').value.trim()
     },
     featuredLimit: Number(document.getElementById('set-featuredLimit').value) || 8,
-    heroSlides: heroSlidesDraft
+    heroSlides: heroSlidesDraft,
+    spaces: spacesDraft.map(function (sp) {
+      return Object.assign({}, sp, { bullets: (sp.bullets || []).filter(function (b) { return b.trim(); }) });
+    })
   };
   updateDoc(doc(db, 'settings', 'main'), { appearance: appearance }).then(function () {
     settingsCache = Object.assign({}, settingsCache, { appearance: appearance });
@@ -1251,6 +1445,15 @@ window.adminHandleProductImageDrop = handleProductImageDrop;
 window.adminUpdateHeroCaption = updateHeroCaption;
 window.adminRemoveHeroSlide = removeHeroSlide;
 window.adminHandleHeroImageDrop = handleHeroImageDrop;
+window.adminAddSpace = addSpace;
+window.adminRemoveSpace = removeSpace;
+window.adminMoveSpace = moveSpace;
+window.adminUpdateSpaceField = updateSpaceField;
+window.adminAddSpaceBullet = addSpaceBullet;
+window.adminUpdateSpaceBullet = updateSpaceBullet;
+window.adminRemoveSpaceBullet = removeSpaceBullet;
+window.adminHandleSpaceImageDrop = handleSpaceImageDrop;
+window.adminRemoveSpaceImage = removeSpaceImage;
 window.adminOpenCategoryModal = openCategoryModal;
 window.adminSelectIconOption = selectIconOption;
 window.adminSaveCategory = saveCategory;

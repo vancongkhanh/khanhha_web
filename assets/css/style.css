@@ -243,6 +243,12 @@
     background:var(--pine);border-radius:20px;min-height:260px;display:flex;align-items:center;justify-content:center;
   }
   .tab-panel .visual svg{width:120px;height:120px;stroke:var(--copper-light);}
+  .tab-panel .visual.has-photo{
+    background:transparent;position:relative;overflow:hidden;padding:0;
+  }
+  .tab-panel .visual.has-photo .slideshow{min-height:260px;}
+  .tab-panel .visual.has-photo .slide-nav{width:32px;height:32px;}
+  .tab-panel .visual.has-photo .slide-nav svg{width:14px;height:14px;}
   .tab-panel .info h3{font-size:24px;margin-bottom:10px;}
   .tab-panel .info p{color:var(--muted);font-size:14.5px;margin-bottom:16px;}
   .tab-panel .info ul{list-style:none;display:flex;flex-direction:column;gap:8px;margin-bottom:20px;}

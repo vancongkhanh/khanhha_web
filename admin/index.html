@@ -265,6 +265,20 @@
   }
   .hero-slide-item input:focus{outline:none;border-color:var(--copper);}
 
+  /* Quản lý khu vực "Gợi ý không gian" */
+  .space-item{border:1.5px solid var(--border);border-radius:14px;padding:16px;margin-bottom:16px;background:var(--bg);}
+  .space-item-head{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+  .space-item-head strong{font-size:14.5px;color:var(--ink);}
+  .space-item-actions{display:flex;gap:6px;}
+  .space-item-actions .icon-btn:disabled{opacity:.35;cursor:not-allowed;}
+  .space-bullets{display:flex;flex-direction:column;gap:8px;}
+  .space-bullet-row{display:flex;gap:8px;align-items:center;}
+  .space-bullet-row input{
+    flex:1;min-width:0;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);font-size:13px;background:#fff;
+  }
+  .space-bullet-row input:focus{outline:none;border-color:var(--copper);}
+  .spaces-add-btn{margin-top:4px;}
+
   /* Icon picker (danh mục) */
   .icon-picker{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;}
   .icon-option{
@@ -601,6 +615,16 @@
               </div>
               <input type="file" id="hero-image-file" accept="image/*" multiple style="display:none;">
               <div class="hero-slides-list" id="hero-slides-list"></div>
+            </div>
+            <div class="form-field full">
+              <label>Mục "Gợi ý không gian" (Góc bếp, Phòng khách...)</label>
+              <span class="hint">
+                Mỗi khu vực là 1 tab trên trang chủ, có tiêu đề, mô tả, danh sách gạch đầu dòng, nút bấm và ảnh riêng.
+                Ảnh nên chụp ngang hoặc vuông, tỷ lệ khoảng 4:3 — ví dụ 800×600px trở lên. Có thể thêm nhiều ảnh cho 1 khu vực,
+                khách sẽ bấm nút trái/phải để xem hết.
+              </span>
+              <div id="spaces-list"></div>
+              <button type="button" class="btn btn-outline btn-sm spaces-add-btn" onclick="adminAddSpace()">+ Thêm khu vực</button>
             </div>
           </div>
           <div class="save-bar"><button class="btn btn-outline" onclick="cancelSettings('appearance')">Huỷ</button><button class="btn btn-primary" onclick="saveSettingsAppearance()">Lưu thay đổi</button></div>

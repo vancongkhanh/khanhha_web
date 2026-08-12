@@ -110,6 +110,7 @@ function loadSiteConfig() {
         applySiteConfig();
         initZaloFollow();
         initHeroSlideshow();
+        refreshSpacesSection();
       }
     } catch (err) {
       console.error('Không tải được cấu hình cửa hàng:', err);
@@ -123,7 +124,7 @@ document.addEventListener('DOMContentLoaded', function () {
   initMobileNav();
   initHeaderSearch();
   initHeroSlideshow();
-  initSpaceTabs();
+  refreshSpacesSection();
   initZaloFollow();
   initContactForm();
   var configPromise = loadSiteConfig();
@@ -212,6 +213,53 @@ function initHeaderSearch() {
 }
 
 /**
+ * Bộ điều khiển slideshow dùng chung (hero + từng khu vực trong mục
+ * "Gợi ý không gian"): dựng chấm điều hướng, tự chạy nếu có autoplayMs,
+ * trả về {next, prev, destroy} để nút mũi tên bên ngoài gọi vào.
+ */
+function createSlideshow(wrap, dotsWrap, autoplayMs) {
+  var slides = wrap.querySelectorAll('.slide');
+  if (!slides.length) return null;
+
+  var current = 0;
+  var timer = null;
+
+  if (dotsWrap) {
+    dotsWrap.innerHTML = '';
+    slides.forEach(function (_, i) {
+      var dot = document.createElement('button');
+      dot.type = 'button';
+      dot.className = 'slide-dot' + (i === 0 ? ' active' : '');
+      dot.setAttribute('aria-label', 'Xem ảnh ' + (i + 1));
+      dot.addEventListener('click', function () { goTo(i); resetTimer(); });
+      dotsWrap.appendChild(dot);
+    });
+  }
+
+  function goTo(index) {
+    slides[current].classList.remove('active');
+    if (dotsWrap) dotsWrap.children[current].classList.remove('active');
+    current = (index + slides.length) % slides.length;
+    slides[current].classList.add('active');
+    if (dotsWrap) dotsWrap.children[current].classList.add('active');
+  }
+
+  function resetTimer() {
+    if (!autoplayMs) return;
+    clearInterval(timer);
+    timer = setInterval(function () { goTo(current + 1); }, autoplayMs);
+  }
+
+  resetTimer();
+
+  return {
+    next: function () { goTo(current + 1); resetTimer(); },
+    prev: function () { goTo(current - 1); resetTimer(); },
+    destroy: function () { clearInterval(timer); }
+  };
+}
+
+/**
  * Slideshow ở khối hero — chỉ có ở trang chủ. Tự chạy mỗi 4.5 giây,
  * có nút mũi tên và chấm điều hướng để bấm chuyển thủ công.
  */
@@ -236,49 +284,6 @@ function renderHeroSlidesFromConfig(wrap) {
 
 var heroSlideState = null;
 
-function setupHeroSlides(wrap, dotsWrap) {
-  var slides = wrap.querySelectorAll('.slide');
-  if (!slides.length) return;
-
-  if (heroSlideState && heroSlideState.timer) clearInterval(heroSlideState.timer);
-  dotsWrap.innerHTML = '';
-
-  var current = 0;
-
-  slides.forEach(function (_, i) {
-    var dot = document.createElement('button');
-    dot.className = 'slide-dot' + (i === 0 ? ' active' : '');
-    dot.setAttribute('aria-label', 'Xem ảnh ' + (i + 1));
-    dot.addEventListener('click', function () {
-      goTo(i);
-      resetTimer();
-    });
-    dotsWrap.appendChild(dot);
-  });
-
-  function goTo(index) {
-    slides[current].classList.remove('active');
-    dotsWrap.children[current].classList.remove('active');
-    current = (index + slides.length) % slides.length;
-    slides[current].classList.add('active');
-    dotsWrap.children[current].classList.add('active');
-  }
-
-  function resetTimer() {
-    clearInterval(heroSlideState.timer);
-    heroSlideState.timer = setInterval(function () {
-      goTo(current + 1);
-    }, 4500);
-  }
-
-  heroSlideState = {
-    timer: null,
-    next: function () { goTo(current + 1); resetTimer(); },
-    prev: function () { goTo(current - 1); resetTimer(); }
-  };
-  resetTimer();
-}
-
 function initHeroSlideshow() {
   var wrap = document.getElementById('heroSlideshow');
   var dotsWrap = document.getElementById('slideDots');
@@ -287,7 +292,8 @@ function initHeroSlideshow() {
   if (!wrap) return;
 
   renderHeroSlidesFromConfig(wrap);
-  setupHeroSlides(wrap, dotsWrap);
+  if (heroSlideState) heroSlideState.destroy();
+  heroSlideState = createSlideshow(wrap, dotsWrap, 4500);
 
   if (prevBtn && !prevBtn.dataset.wired) {
     prevBtn.dataset.wired = '1';
@@ -300,7 +306,82 @@ function initHeroSlideshow() {
 }
 
 /**
- * Tabs "Không gian" (Góc bếp / Phòng khách / Ngoài trời) — chỉ có ở trang chủ.
+ * Mục "Gợi ý không gian" (Góc bếp / Phòng khách / Ban công...) — chỉ có ở
+ * trang chủ. Danh sách khu vực + nội dung + ảnh do chủ shop tự cấu hình
+ * trong Admin (SITE_CONFIG.appearance.spaces). Nếu chưa cấu hình, giữ
+ * nguyên các tab tĩnh đã viết sẵn trong HTML làm phương án dự phòng.
+ */
+var spaceSlideStates = [];
+
+function renderSpacesFromConfig() {
+  var spacesData = SITE_CONFIG.appearance && SITE_CONFIG.appearance.spaces;
+  var section = document.getElementById('spaces');
+  var tabsWrap = section ? section.querySelector('.tabs') : null;
+  var wrap = section ? section.querySelector('.wrap') : null;
+  if (!section || !tabsWrap || !wrap || !spacesData || !spacesData.length) return false;
+
+  tabsWrap.innerHTML = spacesData.map(function (s, i) {
+    return '<button type="button" class="tab-btn' + (i === 0 ? ' active' : '') + '" data-tab="' + escapeHtml(s.id || i) + '">' +
+      escapeHtml(s.tabLabel || '') + '</button>';
+  }).join('');
+
+  wrap.querySelectorAll('.tab-panel').forEach(function (p) { p.remove(); });
+  spaceSlideStates.forEach(function (st) { if (st) st.destroy(); });
+  spaceSlideStates = [];
+
+  spacesData.forEach(function (s, i) {
+    var panel = document.createElement('div');
+    panel.className = 'tab-panel' + (i === 0 ? ' active' : '');
+    panel.id = 'tab-' + (s.id || i);
+
+    var images = s.images || [];
+    var slidesHtml = images.length
+      ? images.map(function (img, idx) {
+          return '<div class="slide' + (idx === 0 ? ' active' : '') + '"><div class="slide-photo"><img src="' + storagePathToUrl(img) + '" alt="' + escapeHtml(s.tabLabel || '') + '"></div></div>';
+        }).join('')
+      : '<div class="slide active"><div class="slide-photo" style="display:flex;align-items:center;justify-content:center;background:var(--pine);"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.3" stroke="var(--copper-light)" style="width:64px;height:64px;"><path d="M4 16l4.5-6 4 5 3-3L20 16"/><rect x="3" y="4" width="18" height="16" rx="2"/></svg></div></div>';
+
+    var bulletsHtml = (s.bullets || []).filter(Boolean).map(function (b) {
+      return '<li><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M5 13l4 4L19 7"/></svg> ' + escapeHtml(b) + '</li>';
+    }).join('');
+
+    var navHtml = images.length > 1
+      ? '<button type="button" class="slide-nav prev" aria-label="Ảnh trước"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>' +
+        '<button type="button" class="slide-nav next" aria-label="Ảnh sau"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>' +
+        '<div class="slide-dots"></div>'
+      : '';
+
+    panel.innerHTML =
+      '<div class="visual has-photo"><div class="slideshow">' + slidesHtml + '</div>' + navHtml + '</div>' +
+      '<div class="info">' +
+        '<h3>' + escapeHtml(s.title || '') + '</h3>' +
+        (s.description ? '<p>' + escapeHtml(s.description) + '</p>' : '') +
+        (bulletsHtml ? '<ul>' + bulletsHtml + '</ul>' : '') +
+        (s.ctaLink ? '<a class="btn btn-outline" href="' + s.ctaLink + '">' + escapeHtml(s.ctaText || 'Xem sản phẩm') + '</a>' : '') +
+      '</div>';
+
+    wrap.appendChild(panel);
+
+    if (images.length > 1) {
+      var slideshow = panel.querySelector('.slideshow');
+      var dots = panel.querySelector('.slide-dots');
+      var prevBtn = panel.querySelector('.slide-nav.prev');
+      var nextBtn = panel.querySelector('.slide-nav.next');
+      var state = createSlideshow(slideshow, dots, 5000);
+      spaceSlideStates.push(state);
+      if (state) {
+        prevBtn.addEventListener('click', function () { state.prev(); });
+        nextBtn.addEventListener('click', function () { state.next(); });
+      }
+    }
+  });
+
+  return true;
+}
+
+/**
+ * Gắn sự kiện chuyển tab cho mục "Gợi ý không gian" — gọi lại được nhiều
+ * lần an toàn (mỗi lần renderSpacesFromConfig dựng lại nút, cần gắn lại).
  */
 function initSpaceTabs() {
   var tabButtons = document.querySelectorAll('.tab-btn');
@@ -319,6 +400,11 @@ function initSpaceTabs() {
       if (panel) panel.classList.add('active');
     });
   });
+}
+
+function refreshSpacesSection() {
+  renderSpacesFromConfig();
+  initSpaceTabs();
 }
 
 /**
