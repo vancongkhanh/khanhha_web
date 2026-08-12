@@ -454,7 +454,7 @@
         <div class="card stat-card stat-link" onclick="showPage('products')"><div class="label">Tổng sản phẩm</div><div class="value">42</div></div>
         <div class="card stat-card stat-link" onclick="adminGoToOutOfStock()"><div class="label">Hết hàng</div><div class="value alert">3</div></div>
         <div class="card stat-card stat-link" onclick="showPage('categories')"><div class="label">Danh mục</div><div class="value">6</div></div>
-        <div class="card stat-card stat-link" onclick="showPage('messages')"><div class="label">Tin nhắn mới</div><div class="value alert">2</div></div>
+        <div class="card stat-card stat-link" onclick="adminGoToNewMessages()"><div class="label">Tin nhắn mới</div><div class="value alert">2</div></div>
       </div>
 
       <div class="card" style="padding:22px;">
@@ -518,6 +518,13 @@
     <div class="page" id="page-messages">
       <div class="section-head">
         <div><h3 style="font-size:16px;">Hộp thư liên hệ</h3><p>Tin nhắn khách gửi từ form ở trang Liên hệ</p></div>
+      </div>
+      <div class="filter-toolbar">
+        <select id="mfilter-status">
+          <option value="">Tất cả trạng thái</option>
+          <option value="moi">Mới</option>
+          <option value="da_lien_he">Đã liên hệ</option>
+        </select>
       </div>
       <div class="card">
         <div id="messagesList"></div>

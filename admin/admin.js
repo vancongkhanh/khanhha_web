@@ -821,6 +821,14 @@ function confirmDelete(type, id) {
 
 var messagePage = 1;
 var messagePageSize = 10;
+var messageFilters = { status: '' };
+
+function applyMessageFilters(list) {
+  return list.filter(function (m) {
+    if (messageFilters.status && m.status !== messageFilters.status) return false;
+    return true;
+  });
+}
 
 function renderMessagesPagination(totalItems) {
   var container = document.getElementById('messagesPagination');
@@ -843,10 +851,17 @@ function renderMessages() {
   var list = document.getElementById('messagesList');
   if (!list) return;
 
-  renderMessagesPagination(messagesCache.length);
+  var filtered = applyMessageFilters(messagesCache);
+  renderMessagesPagination(filtered.length);
+
+  if (!filtered.length) {
+    var emptyMsg = messageFilters.status ? 'Không có tin nhắn khớp bộ lọc.' : 'Chưa có tin nhắn nào.';
+    list.innerHTML = '<p class="hint" style="padding:20px;">' + emptyMsg + '</p>';
+    return;
+  }
 
   var startIdx = (messagePage - 1) * messagePageSize;
-  var pageItems = messagesCache.slice(startIdx, startIdx + messagePageSize);
+  var pageItems = filtered.slice(startIdx, startIdx + messagePageSize);
 
   list.innerHTML = pageItems.map(function (m) {
     var badgeClass = m.status === 'moi' ? 'badge-warn' : 'badge-ok';
@@ -875,6 +890,20 @@ document.getElementById('mfilter-pagesize').addEventListener('change', function 
   messagePage = 1;
   renderMessages();
 });
+
+document.getElementById('mfilter-status').addEventListener('change', function () {
+  messageFilters.status = this.value;
+  messagePage = 1;
+  renderMessages();
+});
+
+function goToNewMessages() {
+  showPage('messages');
+  messageFilters.status = 'moi';
+  document.getElementById('mfilter-status').value = 'moi';
+  messagePage = 1;
+  renderMessages();
+}
 
 function renderRecentMessages() {
   var list = document.getElementById('recentMessagesList');
@@ -1158,6 +1187,7 @@ window.adminSetMessageStatus = setMessageStatus;
 window.adminSaveMessageNote = saveMessageNote;
 window.showPage = showPage;
 window.adminGoToOutOfStock = goToOutOfStock;
+window.adminGoToNewMessages = goToNewMessages;
 window.saveSettingsAppearance = saveSettingsAppearance;
 window.saveSettingsStore = saveSettingsStore;
 window.saveSettingsLinks = saveSettingsLinks;
