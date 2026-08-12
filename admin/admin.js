@@ -1047,6 +1047,7 @@ function populateSettingsForms(s) {
   document.getElementById('set-heroTitle2').value = hero.titleLine2 || '';
   document.getElementById('set-heroDesc').value = hero.description || '';
   document.getElementById('set-featuredLimit').value = appearance.featuredLimit || 8;
+  document.getElementById('set-priceDisplayMode').value = appearance.priceDisplayMode || 'show';
   heroSlidesDraft = (appearance.heroSlides || []).map(function (s) { return Object.assign({}, s); });
   renderHeroSlidesEditor();
 
@@ -1383,6 +1384,7 @@ function saveSettingsAppearance(btn) {
       description: document.getElementById('set-heroDesc').value.trim()
     },
     featuredLimit: Number(document.getElementById('set-featuredLimit').value) || 8,
+    priceDisplayMode: document.getElementById('set-priceDisplayMode').value || 'show',
     heroSlides: heroSlidesDraft,
     spaces: spacesDraft.map(function (sp) {
       return Object.assign({}, sp, { bullets: (sp.bullets || []).filter(function (b) { return b.trim(); }) });

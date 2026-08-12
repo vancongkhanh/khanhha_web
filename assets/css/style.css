@@ -123,10 +123,11 @@
   }
   .slide-nav{
     position:absolute;top:50%;transform:translateY(-50%);width:38px;height:38px;border-radius:50%;
-    background:rgba(20,30,28,.4);border:none;color:#fff;cursor:pointer;
+    background:var(--pine);border:2px solid rgba(255,255,255,.85);color:#fff;cursor:pointer;
     display:flex;align-items:center;justify-content:center;z-index:3;
+    box-shadow:0 3px 10px rgba(0,0,0,.35);
   }
-  .slide-nav:hover{background:rgba(20,30,28,.6);}
+  .slide-nav:hover{background:var(--copper);}
   .slide-nav svg{width:18px;height:18px;}
   .slide-nav.prev{left:14px;}
   .slide-nav.next{right:14px;}
@@ -186,6 +187,25 @@
     padding:3px 9px;border-radius:999px;
   }
   .empty-state{grid-column:1/-1;text-align:center;color:var(--muted);padding:32px 0;}
+
+  /* ===== Skeleton loading (khi đang tải dữ liệu) ===== */
+  @keyframes skeletonPulse{0%,100%{opacity:.5;}50%{opacity:1;}}
+  .skeleton-thumb,.skeleton-line,.skeleton-detail-gallery{
+    background:rgba(31,59,44,.1);border-radius:8px;animation:skeletonPulse 1.3s ease-in-out infinite;
+  }
+  .skeleton-card{background:var(--card);border-radius:var(--radius);overflow:hidden;border:1px solid rgba(31,59,44,.08);}
+  .skeleton-card .skeleton-thumb{height:140px;border-radius:0;}
+  .skeleton-card .skeleton-body{padding:16px;display:flex;flex-direction:column;gap:10px;}
+  .skeleton-line{height:10px;}
+  .skeleton-line.w-40{width:40%;height:14px;}
+  .skeleton-line.w-70{width:70%;}
+  .skeleton-detail-gallery{aspect-ratio:1/1;width:100%;}
+  .skeleton-detail-info{display:flex;flex-direction:column;gap:14px;padding-top:8px;}
+  .skeleton-detail-info .skeleton-line.tag{height:12px;width:30%;}
+  .skeleton-detail-info .skeleton-line.title{height:26px;width:75%;}
+  .skeleton-detail-info .skeleton-line.price{height:22px;width:35%;margin-top:6px;}
+  .skeleton-detail-info .skeleton-line.desc{height:11px;}
+  .skeleton-detail-info .skeleton-line.desc.short{width:70%;}
   .pagination-bar{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:32px;}
   .pagination-bar .page-btn{
     padding:9px 18px;border-radius:999px;border:1.5px solid rgba(31,59,44,.18);background:var(--card);
@@ -244,7 +264,7 @@
   }
   .tab-panel .visual svg{width:120px;height:120px;stroke:var(--copper-light);}
   .tab-panel .visual.has-photo{
-    background:var(--pine);position:relative;overflow:hidden;padding:0;
+    background:var(--sand);position:relative;overflow:hidden;padding:0;
     min-height:0;aspect-ratio:4/3;
   }
   .tab-panel .visual.has-photo .slideshow{min-height:0;height:100%;}

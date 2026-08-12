@@ -38,7 +38,8 @@ var SITE_CONFIG = {
       titleHighlight: 'ấm áp',
       titleLine2: 'mỗi góc nhà',
       description: 'Khánh Hà chọn lọc đồ bếp, đồ điện gia dụng, kệ tủ inox và đồ nhựa bền chắc — mang sự gọn gàng, tiện lợi đến từng gia đình ở Phan Thiết.'
-    }
+    },
+    priceDisplayMode: 'show'
   },
   store: {
     address: 'Km 3, xã Hàm Liêm, tỉnh Lâm Đồng',
@@ -583,6 +584,26 @@ function formatPrice(n) {
   return Number(n || 0).toLocaleString('vi-VN') + '₫';
 }
 
+/**
+ * Chế độ hiển thị giá do chủ shop cấu hình trong Admin: 'show' (hiện giá,
+ * mặc định), 'contact' (ghi "Liên hệ" thay vì số), 'hidden' (không hiện gì).
+ */
+function getPriceDisplayMode() {
+  return (SITE_CONFIG.appearance && SITE_CONFIG.appearance.priceDisplayMode) || 'show';
+}
+
+/**
+ * Dựng HTML dòng giá cho 1 sản phẩm theo chế độ hiển thị hiện tại.
+ * className dùng để giữ nguyên class CSS ở nơi gọi (price / detail-price).
+ */
+function renderPriceHtml(product, className) {
+  var mode = getPriceDisplayMode();
+  if (mode === 'hidden') return '';
+  if (mode === 'contact') return '<div class="' + className + ' price-contact">Liên hệ giá</div>';
+  var oldPriceHtml = product.oldPrice ? ' <span class="old">' + formatPrice(product.oldPrice) + '</span>' : '';
+  return '<div class="' + className + '">' + formatPrice(product.price) + oldPriceHtml + '</div>';
+}
+
 async function fetchCategories() {
   var snap = await getDocs(query(collection(db, 'categories'), orderBy('order')));
   return snap.docs.map(function (d) { return d.data(); });
@@ -634,7 +655,7 @@ function renderProductGrid(container, products, categories) {
       : 'background:' + PROD_THUMB_COLORS[i % PROD_THUMB_COLORS.length] + ';';
 
     var badge = '';
-    if (p.oldPrice) {
+    if (p.oldPrice && getPriceDisplayMode() === 'show') {
       var pct = Math.round((p.oldPrice - p.price) / p.oldPrice * 100);
       badge = '<span class="tag-sale">-' + pct + '%</span>';
     } else if (p.stock === false) {
@@ -642,13 +663,12 @@ function renderProductGrid(container, products, categories) {
     }
 
     var icon = hasImage ? '' : categoryIconSvg(cat.icon, 1.5);
-    var oldPriceHtml = p.oldPrice ? ' <span class="old">' + formatPrice(p.oldPrice) + '</span>' : '';
 
     return '<a class="prod-card" href="san-pham-chi-tiet.html?id=' + encodeURIComponent(p.id) + '" data-category="' + escapeHtml(p.category) + '">' +
       '<div class="prod-thumb" style="' + thumbStyle + '">' + badge + icon + '</div>' +
       '<div class="prod-body"><span class="cat">' + escapeHtml(cat.name || '') + '</span>' +
       '<h3>' + escapeHtml(p.name) + '</h3>' +
-      '<div class="price">' + formatPrice(p.price) + oldPriceHtml + '</div></div>' +
+      renderPriceHtml(p, 'price') + '</div>' +
       '</a>';
   }).join('');
 }
@@ -772,6 +792,32 @@ function updateProductBreadcrumb(product, cat) {
     '<span>' + escapeHtml(product.name) + '</span>';
 }
 
+/**
+ * Sao chép văn bản vào clipboard — dùng Clipboard API khi có (context https),
+ * dự phòng bằng textarea ẩn + execCommand cho trình duyệt cũ hơn.
+ */
+function copyTextToClipboard(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    return navigator.clipboard.writeText(text).catch(function () { return fallbackCopyText(text); });
+  }
+  return fallbackCopyText(text);
+}
+
+function fallbackCopyText(text) {
+  return new Promise(function (resolve) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    try { document.execCommand('copy'); } catch (e) { /* vẫn mở Zalo bình thường dù copy lỗi */ }
+    document.body.removeChild(ta);
+    resolve();
+  });
+}
+
 function renderProductDetail(root, product, cat) {
   var galleryImages = (product.images || []).map(storagePathToUrl);
   var hasImage = galleryImages.length > 0;
@@ -781,7 +827,7 @@ function renderProductDetail(root, product, cat) {
   var iconHtml = hasImage ? '' : categoryIconSvg(cat.icon, 1.3);
 
   var badge = '';
-  if (product.oldPrice) {
+  if (product.oldPrice && getPriceDisplayMode() === 'show') {
     var pct = Math.round((product.oldPrice - product.price) / product.oldPrice * 100);
     badge = '<span class="tag-sale">-' + pct + '%</span>';
   } else if (product.stock === false) {
@@ -794,7 +840,6 @@ function renderProductDetail(root, product, cat) {
       }).join('') + '</div>'
     : '';
 
-  var oldPriceHtml = product.oldPrice ? ' <span class="old">' + formatPrice(product.oldPrice) + '</span>' : '';
   var stockHtml = product.stock === false
     ? '<span class="badge-stock out">Hết hàng</span>'
     : '<span class="badge-stock in">Còn hàng</span>';
@@ -809,7 +854,7 @@ function renderProductDetail(root, product, cat) {
       '<span class="cat">' + escapeHtml(cat.name || '') + '</span>' +
       '<h1>' + escapeHtml(product.name) + '</h1>' +
       stockHtml +
-      '<div class="detail-price">' + formatPrice(product.price) + oldPriceHtml + '</div>' +
+      renderPriceHtml(product, 'detail-price') +
       '<p class="detail-desc">' + descHtml + '</p>' +
       '<div class="detail-cta">' +
         '<a class="btn btn-primary" id="detailZaloBtn" href="' + (SITE_CONFIG.links.zaloPersonal || 'https://zalo.me/0898999039') + '" target="_blank" rel="noopener">Nhắn Zalo đặt hàng</a>' +
@@ -824,6 +869,26 @@ function renderProductDetail(root, product, cat) {
         thumb.classList.add('active');
         var idx = Number(thumb.dataset.index);
         document.getElementById('detailMainImage').style.backgroundImage = "url('" + galleryImages[idx] + "')";
+      });
+    });
+  }
+
+  var zaloBtn = document.getElementById('detailZaloBtn');
+  if (zaloBtn) {
+    zaloBtn.addEventListener('click', function (e) {
+      e.preventDefault();
+      var mode = getPriceDisplayMode();
+      var priceLine = mode === 'show' ? formatPrice(product.price) : (mode === 'contact' ? 'Liên hệ giá' : '');
+      var lines = ['Tôi muốn hỏi mua sản phẩm:', product.name];
+      if (priceLine) lines.push('Giá: ' + priceLine);
+      lines.push(window.location.href);
+
+      var zaloUrl = zaloBtn.href;
+      var originalLabel = zaloBtn.textContent;
+      copyTextToClipboard(lines.join('\n')).then(function () {
+        zaloBtn.textContent = 'Đã sao chép — dán vào Zalo nhé!';
+        window.open(zaloUrl, '_blank', 'noopener');
+        setTimeout(function () { zaloBtn.textContent = originalLabel; }, 2500);
       });
     });
   }
