@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Facebook – Cửa hàng Khánh Hà</title>
+<title>Thư viện ảnh – Cửa hàng Khánh Hà</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -33,8 +33,8 @@
     <nav class="navlinks">
       <a href="index.html">Trang chủ</a>
       <a href="san-pham.html">Sản phẩm</a>
-      <a href="thu-vien-anh.html">Thư viện ảnh</a>
-            <a href="facebook.html" style="color:var(--copper);">Facebook</a>
+      <a href="thu-vien-anh.html" style="color:var(--copper);">Thư viện ảnh</a>
+      <a href="facebook.html">Facebook</a>
       <a href="lien-he.html">Liên hệ</a>
     </nav>
     <div class="nav-right"><div class="nav-search">
@@ -55,54 +55,52 @@
 <div class="mobile-nav" id="mobileNav">
       <a href="index.html">Trang chủ</a>
       <a href="san-pham.html">Sản phẩm</a>
-      <a href="thu-vien-anh.html">Thư viện ảnh</a>
-            <a href="facebook.html" style="color:var(--copper);">Facebook</a>
+      <a href="thu-vien-anh.html" style="color:var(--copper);">Thư viện ảnh</a>
+      <a href="facebook.html">Facebook</a>
       <a href="lien-he.html">Liên hệ</a>
     </div>
 
 
 <div class="page-hero">
   <div class="wrap">
-    <span class="eyebrow">Cập nhật mỗi ngày</span>
-    <h1>Khánh Hà trên Facebook</h1>
-    <p>Sản phẩm mới, giá tốt và tình trạng còn hàng — Khánh Hà đăng trực tiếp trên Facebook mỗi ngày</p>
+    <span class="eyebrow">Xem trước khi mua</span>
+    <h1>Thư viện ảnh sản phẩm</h1>
+    <p>Tổng hợp toàn bộ hình ảnh sản phẩm đang bán tại Khánh Hà — bấm vào ảnh để xem chi tiết sản phẩm đó</p>
   </div>
 </div>
 
 <section>
   <div class="wrap">
-    <div class="fb-embed-card">
-      <div id="fb-root"></div>
-      <script async defer crossorigin="anonymous"
-        src="https://connect.facebook.net/vi_VN/sdk.js#xfbml=1&version=v19.0"></script>
-
-      <div class="fb-page"
-           data-href="https://www.facebook.com/profile.php?id=61556893695042" data-config="links.facebook" data-config-attr="data-href"
-           data-tabs="timeline"
-           data-height="600"
-           data-small-header="false"
-           data-adapt-container-width="true"
-           data-hide-cover="false"
-           data-show-facepile="true">
-        <blockquote cite="https://www.facebook.com/profile.php?id=61556893695042" class="fb-xfbml-parse-ignore">
-          <a href="https://www.facebook.com/profile.php?id=61556893695042">Cửa hàng Khánh Hà</a>
-        </blockquote>
-      </div>
+    <div class="search-bar">
+      <input type="text" id="gallerySearch" placeholder="Tìm theo tên sản phẩm, ví dụ: nồi inox, kệ, tủ nhựa...">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+    </div>
+    <div class="filter-bar" id="galleryFilterBar">
+      <button class="filter-btn active" data-filter="all">Tất cả</button>
     </div>
 
-    <div class="fb-cta-row">
-      <a class="btn btn-primary" href="https://www.facebook.com/profile.php?id=61556893695042" target="_blank" rel="noopener">Ghé trang Facebook</a>
-      <a class="btn btn-outline" href="https://m.me/61556893695042" target="_blank" rel="noopener" data-config="links.messenger" data-config-attr="href">Nhắn qua Messenger</a>
+    <div class="gallery-grid" id="galleryGrid">
+      <div class="skeleton-thumb gallery-skeleton"></div>
+      <div class="skeleton-thumb gallery-skeleton"></div>
+      <div class="skeleton-thumb gallery-skeleton"></div>
+      <div class="skeleton-thumb gallery-skeleton"></div>
+      <div class="skeleton-thumb gallery-skeleton"></div>
+      <div class="skeleton-thumb gallery-skeleton"></div>
+      <div class="skeleton-thumb gallery-skeleton"></div>
+      <div class="skeleton-thumb gallery-skeleton"></div>
+      <div class="skeleton-thumb gallery-skeleton"></div>
+      <div class="skeleton-thumb gallery-skeleton"></div>
     </div>
+    <div class="pagination-bar" id="galleryPagination"></div>
   </div>
 </section>
 
 <section class="newsletter">
   <div class="wrap">
-    <h2>Muốn hỏi giá nhanh?</h2>
-    <p>Nhắn trực tiếp qua Zalo hoặc Messenger, Khánh Hà phản hồi trong ngày</p>
+    <h2>Không thấy sản phẩm cần tìm?</h2>
+    <p>Nhắn Zalo để Khánh Hà tư vấn hoặc tìm giúp bạn</p>
     <div class="nl-form">
-      <a class="btn" style="background:var(--pine);color:#fff;" href="lien-he.html">Xem thông tin liên hệ</a>
+      <a class="btn" style="background:var(--pine);color:#fff;" href="https://zalo.me/0898999039" target="_blank" rel="noopener">Nhắn Zalo ngay</a>
     </div>
   </div>
 </section>
@@ -130,6 +128,10 @@
 <script type="module" src="assets/js/script.js"></script>
 
 <!-- Facebook Messenger Chat Plugin -->
+<div id="fb-root"></div>
+<script async defer crossorigin="anonymous"
+  src="https://connect.facebook.net/vi_VN/sdk.js#xfbml=1&version=v19.0"></script>
+
 <div id="fb-customer-chat" class="fb-customerchat"
   attribution="setup_tool"
   page_id="61556893695042"

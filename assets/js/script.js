@@ -137,6 +137,7 @@ document.addEventListener('DOMContentLoaded', function () {
   initHomepageData(configPromise);
   initProductsPageData();
   initProductDetailPage();
+  initGalleryPageData();
 });
 
 /**
@@ -735,6 +736,175 @@ async function initProductsPageData() {
   }
 
   initProductFilter();
+}
+
+/* =======================================================================
+   TRANG THƯ VIỆN ẢNH (thu-vien-anh.html)
+   Mỗi ảnh trong products.images là 1 ô trong lưới — 1 sản phẩm nhiều ảnh
+   thì xuất hiện nhiều ô, đều dẫn tới cùng 1 trang chi tiết sản phẩm.
+   ======================================================================= */
+var GALLERY_ITEMS_PER_PAGE = 24;
+
+function buildGalleryItems(products) {
+  var items = [];
+  products.forEach(function (p) {
+    if (!p.images || !p.images.length) return;
+    p.images.forEach(function (img) {
+      items.push({
+        productId: p.id,
+        productName: p.name,
+        category: p.category,
+        image: img,
+        price: p.price
+      });
+    });
+  });
+  return items;
+}
+
+function renderGalleryGrid(container, items) {
+  if (!container) return;
+
+  if (!items.length) {
+    container.innerHTML = '<p class="empty-state">Chưa có ảnh sản phẩm nào.</p>';
+    return;
+  }
+
+  container.innerHTML = items.map(function (it) {
+    var mode = getPriceDisplayMode();
+    var priceHtml = '';
+    if (mode === 'show') priceHtml = '<span class="gallery-price">' + formatPrice(it.price) + '</span>';
+    else if (mode === 'contact') priceHtml = '<span class="gallery-price">Liên hệ giá</span>';
+
+    return '<a class="gallery-item" href="san-pham-chi-tiet.html?id=' + encodeURIComponent(it.productId) + '"' +
+      ' data-category="' + escapeHtml(it.category) + '" data-search="' + escapeHtml(removeDiacritics(it.productName)) + '">' +
+      '<img src="' + storagePathToUrl(it.image) + '" alt="' + escapeHtml(it.productName) + '" loading="lazy">' +
+      '<span class="gallery-caption">' + escapeHtml(it.productName) + priceHtml + '</span>' +
+      '</a>';
+  }).join('');
+}
+
+/**
+ * Bộ lọc danh mục + tìm kiếm + phân trang cho thư viện ảnh — tương tự
+ * initProductFilter() ở trang Sản phẩm nhưng thao tác trên .gallery-item.
+ */
+function initGalleryFilter() {
+  var filterBar = document.getElementById('galleryFilterBar');
+  var filterButtons = filterBar ? filterBar.querySelectorAll('.filter-btn') : [];
+  var searchInput = document.getElementById('gallerySearch');
+  var items = document.querySelectorAll('.gallery-item');
+  var grid = document.getElementById('galleryGrid');
+  var paginationEl = document.getElementById('galleryPagination');
+  if (!items.length) return;
+
+  var params = new URLSearchParams(window.location.search);
+  var catParam = params.get('cat');
+  var currentCategory = 'all';
+  var currentPage = 1;
+
+  function applyFilters() {
+    var q = searchInput ? removeDiacritics(searchInput.value.trim()) : '';
+    var matches = [];
+
+    items.forEach(function (item) {
+      var matchesCategory = currentCategory === 'all' || item.dataset.category === currentCategory;
+      var matchesQuery = !q || item.dataset.search.indexOf(q) !== -1;
+      var isMatch = matchesCategory && matchesQuery;
+      if (isMatch) matches.push(item);
+    });
+
+    var totalPages = Math.max(1, Math.ceil(matches.length / GALLERY_ITEMS_PER_PAGE));
+    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+
+    var startIdx = (currentPage - 1) * GALLERY_ITEMS_PER_PAGE;
+    var pageSet = matches.slice(startIdx, startIdx + GALLERY_ITEMS_PER_PAGE);
+
+    items.forEach(function (item) {
+      item.hidden = pageSet.indexOf(item) === -1;
+    });
+
+    renderPagination(matches.length, totalPages);
+  }
+
+  function renderPagination(totalItems, totalPages) {
+    if (!paginationEl) return;
+    if (totalItems <= GALLERY_ITEMS_PER_PAGE) {
+      paginationEl.innerHTML = '';
+      return;
+    }
+    paginationEl.innerHTML =
+      '<button type="button" class="page-btn" id="galleryPagePrevBtn">‹ Trước</button>' +
+      '<span class="page-info">Trang ' + currentPage + ' / ' + totalPages + '</span>' +
+      '<button type="button" class="page-btn" id="galleryPageNextBtn">Sau ›</button>';
+
+    var prevBtn = document.getElementById('galleryPagePrevBtn');
+    var nextBtn = document.getElementById('galleryPageNextBtn');
+    prevBtn.disabled = currentPage <= 1;
+    nextBtn.disabled = currentPage >= totalPages;
+    prevBtn.addEventListener('click', function () { goToPage(currentPage - 1); });
+    nextBtn.addEventListener('click', function () { goToPage(currentPage + 1); });
+  }
+
+  function goToPage(page) {
+    currentPage = page;
+    applyFilters();
+    if (grid) grid.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  filterButtons.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      filterButtons.forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      currentCategory = btn.dataset.filter;
+      currentPage = 1;
+      applyFilters();
+    });
+  });
+
+  if (catParam) {
+    var matchedBtn = filterBar ? filterBar.querySelector('.filter-btn[data-filter="' + catParam + '"]') : null;
+    if (matchedBtn) {
+      filterButtons.forEach(function (b) { b.classList.remove('active'); });
+      matchedBtn.classList.add('active');
+      currentCategory = catParam;
+    }
+  }
+
+  if (searchInput) {
+    var q = params.get('q');
+    if (q) searchInput.value = q;
+    searchInput.addEventListener('input', function () {
+      currentPage = 1;
+      applyFilters();
+    });
+  }
+
+  applyFilters();
+}
+
+/**
+ * Trang Thư viện ảnh: gộp ảnh từ toàn bộ sản phẩm đang bán, chia theo
+ * danh mục (dùng lại thanh lọc của trang Sản phẩm), có tìm kiếm theo tên.
+ */
+async function initGalleryPageData() {
+  var grid = document.getElementById('galleryGrid');
+  if (!grid) return;
+
+  var filterBar = document.getElementById('galleryFilterBar');
+
+  try {
+    var results = await Promise.all([fetchCategories(), fetchProducts()]);
+    var categories = results[0];
+    var products = results[1];
+    renderCategoryFilterBar(filterBar, categories);
+    renderGalleryGrid(grid, buildGalleryItems(products));
+  } catch (err) {
+    console.error('Không tải được thư viện ảnh:', err);
+    grid.innerHTML = '<p class="empty-state">Không tải được thư viện ảnh, vui lòng tải lại trang.</p>';
+  }
+
+  initGalleryFilter();
 }
 
 /* =======================================================================
