@@ -261,8 +261,11 @@
   .tab-panel.active{display:grid;grid-template-columns:1.1fr 1fr;gap:36px;align-items:center;}
   .tab-panel .visual{
     background:var(--pine);border-radius:20px;min-height:260px;display:flex;align-items:center;justify-content:center;
+    position:relative;overflow:hidden;
   }
   .tab-panel .visual svg{width:120px;height:120px;stroke:var(--copper-light);}
+  .visual-skeleton{position:absolute;inset:0;background:rgba(255,255,255,.08);animation:skeletonPulse 1.3s ease-in-out infinite;z-index:1;}
+  .visual-skeleton.hide{display:none;}
   .tab-panel .visual.has-photo{
     background:var(--sand);position:relative;overflow:hidden;padding:0;
     min-height:0;aspect-ratio:4/3;

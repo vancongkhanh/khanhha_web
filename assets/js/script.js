@@ -132,6 +132,13 @@ document.addEventListener('DOMContentLoaded', function () {
   initHomepageData(configPromise);
   initProductsPageData();
   initProductDetailPage();
+
+  // Phòng trường hợp không tải được cấu hình (mất mạng...), tự bỏ hiệu ứng
+  // nhấp nháy sau vài giây để không bị "treo" loading mãi — icon tĩnh có
+  // sẵn trong HTML sẽ hiện ra thay thế.
+  setTimeout(function () {
+    document.querySelectorAll('.visual-skeleton').forEach(function (el) { el.classList.add('hide'); });
+  }, 3000);
 });
 
 /**
