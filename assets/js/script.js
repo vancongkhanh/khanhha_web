@@ -1147,6 +1147,7 @@ function initContactForm() {
 
   var status = document.getElementById('contactFormStatus');
   var submitBtn = form.querySelector('button[type="submit"]');
+  var submitBtnDefaultText = submitBtn ? submitBtn.textContent : '';
   var imageInput = document.getElementById('contactImage');
   var imagePreviewName = document.getElementById('contactImagePreviewName');
   var messageInput = document.getElementById('message');
@@ -1221,7 +1222,7 @@ function initContactForm() {
       return;
     }
 
-    if (submitBtn) submitBtn.disabled = true;
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Đang gửi...'; }
 
     var imageFile = imageInput && imageInput.files[0] ? imageInput.files[0] : null;
     if (imageFile && status) {
@@ -1257,7 +1258,7 @@ function initContactForm() {
         status.className = 'form-status error';
       }
     }).finally(function () {
-      if (submitBtn) submitBtn.disabled = false;
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = submitBtnDefaultText; }
     });
   });
 }
