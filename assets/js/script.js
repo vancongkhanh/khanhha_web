@@ -1046,6 +1046,7 @@ function renderProductDetail(root, product, cat) {
     var currentImageIndex = 0;
     var mainImageEl = document.getElementById('detailMainImage');
     var thumbEls = document.querySelectorAll('#detailThumbs .detail-thumb');
+    var autoplayTimer = null;
 
     function goToDetailImage(idx) {
       currentImageIndex = (idx + galleryImages.length) % galleryImages.length;
@@ -1054,14 +1055,27 @@ function renderProductDetail(root, product, cat) {
       thumbEls[currentImageIndex].classList.add('active');
     }
 
+    // Tự chuyển ảnh mỗi 4.5 giây, giống nhịp slideshow ở banner trang chủ
+    // và mục "Gợi ý không gian" — thao tác thủ công (mũi tên/ảnh nhỏ) sẽ
+    // reset lại đồng hồ đếm để không bị nhảy ảnh ngay sau khi vừa bấm.
+    function resetDetailAutoplay() {
+      clearInterval(autoplayTimer);
+      autoplayTimer = setInterval(function () { goToDetailImage(currentImageIndex + 1); }, 4500);
+    }
+
     thumbEls.forEach(function (thumb) {
-      thumb.addEventListener('click', function () { goToDetailImage(Number(thumb.dataset.index)); });
+      thumb.addEventListener('click', function () {
+        goToDetailImage(Number(thumb.dataset.index));
+        resetDetailAutoplay();
+      });
     });
 
     var prevBtn = document.getElementById('detailPrevBtn');
     var nextBtn = document.getElementById('detailNextBtn');
-    if (prevBtn) prevBtn.addEventListener('click', function () { goToDetailImage(currentImageIndex - 1); });
-    if (nextBtn) nextBtn.addEventListener('click', function () { goToDetailImage(currentImageIndex + 1); });
+    if (prevBtn) prevBtn.addEventListener('click', function () { goToDetailImage(currentImageIndex - 1); resetDetailAutoplay(); });
+    if (nextBtn) nextBtn.addEventListener('click', function () { goToDetailImage(currentImageIndex + 1); resetDetailAutoplay(); });
+
+    resetDetailAutoplay();
   }
 
   var zaloBtn = document.getElementById('detailZaloBtn');
