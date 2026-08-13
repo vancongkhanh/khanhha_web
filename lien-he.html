@@ -103,14 +103,16 @@
 
     <div>
       <h2 style="font-size:22px;margin-bottom:16px;">Gửi tin nhắn cho Khánh Hà</h2>
-      <form class="contact-form" id="contactForm">
+      <form class="contact-form" id="contactForm" novalidate>
         <div>
           <label for="name">Họ và tên <span class="req">*</span></label>
           <input id="name" type="text" placeholder="Tên của bạn" required>
+          <p class="field-error" id="nameError"></p>
         </div>
         <div>
           <label for="phone">Số điện thoại / Zalo <span class="req">*</span></label>
           <input id="phone" type="tel" placeholder="Số điện thoại/Zalo của bạn" required>
+          <p class="field-error" id="phoneError"></p>
         </div>
         <div>
           <label for="message">Nội dung <span class="req">*</span></label>
@@ -121,6 +123,7 @@
             <button type="button" class="msg-quick-btn" data-text="Em muốn đặt mua, anh/chị hướng dẫn giúp em ạ?">Muốn đặt mua</button>
           </div>
           <textarea id="message" placeholder="Bạn cần đặt sản phẩm gì, hoặc muốn hỏi điều gì?" required></textarea>
+          <p class="field-error" id="messageError"></p>
         </div>
         <div>
           <label for="contactImage">Ảnh đính kèm (không bắt buộc)</label>

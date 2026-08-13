@@ -1182,18 +1182,42 @@ function initContactForm() {
     });
   }
 
+  // Kiểm tra + báo lỗi tiếng Việt ngay dưới từng ô, thay cho tooltip mặc
+  // định của trình duyệt (thường hiện tiếng Anh và không khớp giao diện).
+  var requiredFields = [
+    { input: document.getElementById('name'), error: document.getElementById('nameError'), message: 'Vui lòng nhập họ và tên.' },
+    { input: document.getElementById('phone'), error: document.getElementById('phoneError'), message: 'Vui lòng nhập số điện thoại/Zalo.' },
+    { input: messageInput, error: document.getElementById('messageError'), message: 'Vui lòng nhập nội dung cần hỏi.' }
+  ];
+
+  function setFieldError(field, message) {
+    if (field.error) field.error.textContent = message;
+    if (field.input) field.input.classList.toggle('invalid', !!message);
+  }
+
+  requiredFields.forEach(function (field) {
+    if (!field.input) return;
+    field.input.addEventListener('input', function () {
+      if (field.input.value.trim()) setFieldError(field, '');
+    });
+  });
+
   form.addEventListener('submit', function (e) {
     e.preventDefault();
 
     var name = document.getElementById('name').value.trim();
     var phone = document.getElementById('phone').value.trim();
-    var content = document.getElementById('message').value.trim();
+    var content = messageInput.value.trim();
 
-    if (!name || !phone || !content) {
-      if (status) {
-        status.textContent = 'Vui lòng nhập đầy đủ họ tên, số điện thoại và nội dung.';
-        status.className = 'form-status error';
-      }
+    var firstInvalid = null;
+    requiredFields.forEach(function (field) {
+      var hasValue = field.input.value.trim();
+      setFieldError(field, hasValue ? '' : field.message);
+      if (!hasValue && !firstInvalid) firstInvalid = field.input;
+    });
+
+    if (firstInvalid) {
+      firstInvalid.focus();
       return;
     }
 
@@ -1220,6 +1244,7 @@ function initContactForm() {
       return addDoc(collection(db, 'messages'), payload);
     }).then(function () {
       form.reset();
+      requiredFields.forEach(function (field) { setFieldError(field, ''); });
       if (imagePreviewName) imagePreviewName.textContent = '';
       if (status) {
         status.textContent = 'Đã gửi, Khánh Hà sẽ liên hệ lại sớm.';
