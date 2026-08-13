@@ -229,6 +229,12 @@
     max-height:88vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.25);
   }
   .modal-panel.modal-sm{max-width:420px;}
+  #productInfoOverlay{z-index:110;}
+  .pinfo-thumb{width:100%;aspect-ratio:4/3;border-radius:10px;background:var(--pine);background-size:cover;background-position:center;margin-bottom:14px;}
+  .pinfo-price{display:flex;align-items:baseline;gap:10px;margin:2px 0;}
+  .pinfo-price .now{font-size:19px;font-weight:700;color:var(--copper);}
+  .pinfo-price .old{font-size:13.5px;color:var(--muted);text-decoration:line-through;}
+  .pinfo-price .pct{font-size:12px;font-weight:600;color:#fff;background:var(--copper);padding:2px 8px;border-radius:999px;}
   .modal-head{display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--border);}
   .modal-head h3{font-size:17px;}
   .modal-close{background:none;border:none;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--muted);}
@@ -686,6 +692,11 @@
 <!-- Drawer chi tiết tin nhắn -->
 <div class="drawer-overlay" id="drawerOverlay">
   <div class="drawer-panel" id="drawerPanel"></div>
+</div>
+
+<!-- Popup xem nhanh thông tin sản phẩm (mở từ link trong nội dung tin nhắn) -->
+<div class="modal-overlay" id="productInfoOverlay">
+  <div class="modal-panel modal-sm" id="productInfoPanel"></div>
 </div>
 
 <div class="toast" id="toast"></div>

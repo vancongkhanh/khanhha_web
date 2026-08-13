@@ -89,6 +89,16 @@ function linkifyText(str) {
 
 function formatVND(n) { return Number(n || 0).toLocaleString('vi-VN') + '₫'; }
 
+/**
+ * Nội dung tin nhắn từ nút "Gửi tin nhắn" ở trang chi tiết sản phẩm luôn
+ * kèm link dạng san-pham-chi-tiet.html?id=XXX — bóc ra id để bật popup
+ * xem nhanh thông tin sản phẩm ngay trong Hộp thư.
+ */
+function extractProductIdFromContent(content) {
+  var match = String(content || '').match(/san-pham-chi-tiet\.html\?id=([^\s&"'<]+)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 function removeDiacritics(str) {
   return String(str || '')
     .normalize('NFD')
@@ -958,6 +968,10 @@ function openMessageDetail(id) {
   var phoneDigits = (m.phone || '').replace(/[^0-9+]/g, '');
   var telHref = 'tel:' + phoneDigits;
   var zaloHref = 'https://zalo.me/' + phoneDigits;
+  var linkedProductId = extractProductIdFromContent(m.content);
+  var productInfoBtnHtml = linkedProductId
+    ? '<button type="button" class="btn btn-outline btn-sm" style="margin-top:10px;" onclick="event.stopPropagation();adminOpenProductInfo(\'' + linkedProductId + '\')">🔎 Xem thông tin sản phẩm</button>'
+    : '';
 
   var panel = document.getElementById('drawerPanel');
   panel.innerHTML =
@@ -966,7 +980,7 @@ function openMessageDetail(id) {
     '<div class="detail-row"><span>Khách hàng</span><span>' + escapeHtml(m.name) + '</span></div>' +
     '<div class="detail-row"><span>Số điện thoại</span><span>' + escapeHtml(m.phone) + '</span></div>' +
     '<div class="detail-row"><span>Thời gian gửi</span><span>' + formatRelativeTime(m.createdAt) + '</span></div>' +
-    '<div style="margin-top:16px;"><label style="font-size:12.5px;font-weight:600;">Nội dung khách gửi</label><p style="font-size:14px;margin-top:6px;line-height:1.6;white-space:pre-line;word-break:break-word;">' + linkifyText(m.content) + '</p></div>' +
+    '<div style="margin-top:16px;"><label style="font-size:12.5px;font-weight:600;">Nội dung khách gửi</label><p style="font-size:14px;margin-top:6px;line-height:1.6;white-space:pre-line;word-break:break-word;">' + linkifyText(m.content) + '</p>' + productInfoBtnHtml + '</div>' +
     (m.imageUrl
       ? '<div style="margin-top:16px;"><label style="font-size:12.5px;font-weight:600;">Ảnh khách gửi kèm</label>' +
         '<a href="' + m.imageUrl + '" target="_blank" rel="noopener"><img src="' + m.imageUrl + '" alt="Ảnh khách gửi" style="width:100%;max-height:260px;object-fit:cover;border-radius:10px;margin-top:6px;display:block;"></a></div>'
@@ -990,6 +1004,56 @@ function openMessageDetail(id) {
 
 function closeDrawer() { document.getElementById('drawerOverlay').classList.remove('open'); }
 document.getElementById('drawerOverlay').addEventListener('click', function (e) { if (e.target === this) closeDrawer(); });
+
+/**
+ * Popup xem nhanh toàn bộ thông tin 1 sản phẩm — mở từ nút "Xem thông tin
+ * sản phẩm" trong Chi tiết tin nhắn, để xem trước khi trả lời khách.
+ * Nổi trên cả drawer (z-index riêng, xem #productInfoOverlay trong index.html).
+ */
+function openProductInfoModal(id) {
+  var product = productsCache.find(function (p) { return p.id === id; });
+  var panel = document.getElementById('productInfoPanel');
+
+  if (!product) {
+    panel.innerHTML =
+      '<div class="modal-head"><h3>Thông tin sản phẩm</h3><button class="modal-close" onclick="adminCloseProductInfo()">' + closeXIcon() + '</button></div>' +
+      '<div class="modal-body"><p class="hint">Không tìm thấy sản phẩm này — có thể đã bị xoá.</p></div>';
+    document.getElementById('productInfoOverlay').classList.add('open');
+    return;
+  }
+
+  var hasImage = product.images && product.images.length > 0;
+  var thumbStyle = hasImage ? "background-image:url('" + storagePathToUrl(product.images[0]) + "');" : '';
+
+  var priceHtml = '<div class="pinfo-price"><span class="now">' + formatVND(product.price) + '</span>';
+  if (product.oldPrice) {
+    var pct = Math.round((product.oldPrice - product.price) / product.oldPrice * 100);
+    priceHtml += '<span class="old">' + formatVND(product.oldPrice) + '</span><span class="pct">-' + pct + '%</span>';
+  }
+  priceHtml += '</div>';
+
+  panel.innerHTML =
+    '<div class="modal-head"><h3>Thông tin sản phẩm</h3><button class="modal-close" onclick="adminCloseProductInfo()">' + closeXIcon() + '</button></div>' +
+    '<div class="modal-body">' +
+    '<div class="pinfo-thumb" style="' + thumbStyle + '"></div>' +
+    '<div class="detail-row"><span>Tên sản phẩm</span><span>' + escapeHtml(product.name) + '</span></div>' +
+    '<div class="detail-row"><span>Danh mục</span><span>' + escapeHtml(categoryName(product.category)) + '</span></div>' +
+    '<div class="detail-row"><span>Giá</span>' + priceHtml + '</div>' +
+    '<div class="detail-row"><span>Tình trạng</span><span>' + (product.stock === false ? 'Hết hàng' : 'Còn hàng') + '</span></div>' +
+    '<div class="detail-row"><span>Bán chạy</span><span>' + (product.isFeatured ? 'Có' : 'Không') + '</span></div>' +
+    '<div class="detail-row"><span>Hiển thị trên web</span><span>' + (product.isActive === false ? 'Đã ẩn' : 'Đang hiển thị') + '</span></div>' +
+    (product.description
+      ? '<div style="margin-top:14px;"><label style="font-size:12.5px;font-weight:600;">Mô tả</label><p style="font-size:13.5px;margin-top:6px;line-height:1.6;white-space:pre-line;">' + escapeHtml(product.description) + '</p></div>'
+      : '') +
+    '</div>' +
+    '<div class="modal-foot"><button class="btn btn-outline" onclick="adminCloseProductInfo()">Đóng</button>' +
+    '<button class="btn btn-primary" onclick="adminCloseProductInfo();adminOpenProductModal(\'edit\',\'' + product.id + '\')">Sửa sản phẩm</button></div>';
+
+  document.getElementById('productInfoOverlay').classList.add('open');
+}
+
+function closeProductInfoModal() { document.getElementById('productInfoOverlay').classList.remove('open'); }
+document.getElementById('productInfoOverlay').addEventListener('click', function (e) { if (e.target === this) closeProductInfoModal(); });
 
 function setMessageStatus(id, status) {
   showToast('Đang cập nhật...');
@@ -1514,6 +1578,8 @@ window.showPage = showPage;
 window.adminGoToOutOfStock = goToOutOfStock;
 window.adminGoToNewMessages = goToNewMessages;
 window.adminGoToMessageDetail = goToMessageDetail;
+window.adminOpenProductInfo = openProductInfoModal;
+window.adminCloseProductInfo = closeProductInfoModal;
 window.saveSettingsAppearance = saveSettingsAppearance;
 window.saveSettingsStore = saveSettingsStore;
 window.saveSettingsLinks = saveSettingsLinks;
