@@ -1046,8 +1046,7 @@ function openProductInfoModal(id) {
       ? '<div style="margin-top:14px;"><label style="font-size:12.5px;font-weight:600;">Mô tả</label><p style="font-size:13.5px;margin-top:6px;line-height:1.6;white-space:pre-line;">' + escapeHtml(product.description) + '</p></div>'
       : '') +
     '</div>' +
-    '<div class="modal-foot"><button class="btn btn-outline" onclick="adminCloseProductInfo()">Đóng</button>' +
-    '<button class="btn btn-primary" onclick="adminCloseProductInfo();adminOpenProductModal(\'edit\',\'' + product.id + '\')">Sửa sản phẩm</button></div>';
+    '<div class="modal-foot"><button class="btn btn-primary" onclick="adminCloseProductInfo()">Đóng</button></div>';
 
   document.getElementById('productInfoOverlay').classList.add('open');
 }
