@@ -1025,6 +1025,9 @@ document.getElementById('drawerOverlay').addEventListener('click', function (e) 
  * sản phẩm" trong Chi tiết tin nhắn, để xem trước khi trả lời khách.
  * Nổi trên cả drawer (z-index riêng, xem #productInfoOverlay trong index.html).
  */
+var pinfoImages = [];
+var pinfoIndex = 0;
+
 function openProductInfoModal(id) {
   var product = productsCache.find(function (p) { return p.id === id; });
   var panel = document.getElementById('productInfoPanel');
@@ -1037,8 +1040,14 @@ function openProductInfoModal(id) {
     return;
   }
 
-  var hasImage = product.images && product.images.length > 0;
-  var thumbStyle = hasImage ? "background-image:url('" + storagePathToUrl(product.images[0]) + "');" : '';
+  pinfoImages = (product.images || []).map(storagePathToUrl);
+  pinfoIndex = 0;
+
+  var pinfoNavHtml = pinfoImages.length > 1
+    ? '<button type="button" class="pinfo-nav prev" onclick="event.stopPropagation();adminPinfoPrev()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>' +
+      '<button type="button" class="pinfo-nav next" onclick="event.stopPropagation();adminPinfoNext()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>' +
+      '<span class="pinfo-counter" id="pinfoCounter"></span>'
+    : '';
 
   var priceHtml = '<div class="pinfo-price"><span class="now">' + formatVND(product.price) + '</span>';
   if (product.oldPrice) {
@@ -1050,7 +1059,7 @@ function openProductInfoModal(id) {
   panel.innerHTML =
     '<div class="modal-head"><h3>Thông tin sản phẩm</h3><button class="modal-close" onclick="adminCloseProductInfo()">' + closeXIcon() + '</button></div>' +
     '<div class="modal-body">' +
-    '<div class="pinfo-thumb" style="' + thumbStyle + '"></div>' +
+    '<div class="pinfo-thumb" id="pinfoThumb">' + pinfoNavHtml + '</div>' +
     '<div class="detail-row"><span>Tên sản phẩm</span><span>' + escapeHtml(product.name) + '</span></div>' +
     '<div class="detail-row"><span>Danh mục</span><span>' + escapeHtml(categoryName(product.category)) + '</span></div>' +
     '<div class="detail-row"><span>Giá</span>' + priceHtml + '</div>' +
@@ -1064,7 +1073,23 @@ function openProductInfoModal(id) {
     '<div class="modal-foot"><button class="btn btn-primary" onclick="adminCloseProductInfo()">Đóng</button></div>';
 
   document.getElementById('productInfoOverlay').classList.add('open');
+  renderPinfoImage();
 }
+
+/**
+ * Vẽ lại ảnh hiện tại + số đếm trong popup thông tin sản phẩm, dùng khi
+ * mở popup lần đầu và mỗi lần bấm mũi tên chuyển ảnh.
+ */
+function renderPinfoImage() {
+  var thumb = document.getElementById('pinfoThumb');
+  if (!thumb) return;
+  thumb.style.backgroundImage = pinfoImages.length ? "url('" + pinfoImages[pinfoIndex] + "')" : '';
+  var counter = document.getElementById('pinfoCounter');
+  if (counter) counter.textContent = (pinfoIndex + 1) + ' / ' + pinfoImages.length;
+}
+
+function pinfoPrev() { pinfoIndex = (pinfoIndex - 1 + pinfoImages.length) % pinfoImages.length; renderPinfoImage(); }
+function pinfoNext() { pinfoIndex = (pinfoIndex + 1) % pinfoImages.length; renderPinfoImage(); }
 
 function closeProductInfoModal() { document.getElementById('productInfoOverlay').classList.remove('open'); }
 document.getElementById('productInfoOverlay').addEventListener('click', function (e) { if (e.target === this) closeProductInfoModal(); });
@@ -1102,10 +1127,16 @@ function closeImageLightbox() { document.getElementById('imgLightboxOverlay').cl
 
 document.getElementById('imgLightboxOverlay').addEventListener('click', function (e) { if (e.target === this) closeImageLightbox(); });
 document.addEventListener('keydown', function (e) {
-  if (!document.getElementById('imgLightboxOverlay').classList.contains('open')) return;
-  if (e.key === 'Escape') closeImageLightbox();
-  else if (e.key === 'ArrowLeft') lightboxPrev();
-  else if (e.key === 'ArrowRight') lightboxNext();
+  if (document.getElementById('imgLightboxOverlay').classList.contains('open')) {
+    if (e.key === 'Escape') closeImageLightbox();
+    else if (e.key === 'ArrowLeft') lightboxPrev();
+    else if (e.key === 'ArrowRight') lightboxNext();
+    return;
+  }
+  if (document.getElementById('productInfoOverlay').classList.contains('open') && pinfoImages.length > 1) {
+    if (e.key === 'ArrowLeft') pinfoPrev();
+    else if (e.key === 'ArrowRight') pinfoNext();
+  }
 });
 
 function setMessageStatus(id, status) {
@@ -1632,6 +1663,8 @@ window.adminGoToOutOfStock = goToOutOfStock;
 window.adminGoToNewMessages = goToNewMessages;
 window.adminGoToMessageDetail = goToMessageDetail;
 window.adminOpenProductInfo = openProductInfoModal;
+window.adminPinfoPrev = pinfoPrev;
+window.adminPinfoNext = pinfoNext;
 window.adminCloseProductInfo = closeProductInfoModal;
 window.adminOpenMessageImage = openMessageImageLightbox;
 window.adminCloseImageLightbox = closeImageLightbox;
