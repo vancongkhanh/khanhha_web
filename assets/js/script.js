@@ -1015,6 +1015,11 @@ function renderProductDetail(root, product, cat) {
       }).join('') + '</div>'
     : '';
 
+  var galleryNavHtml = galleryImages.length > 1
+    ? '<button type="button" class="slide-nav prev" id="detailPrevBtn" aria-label="Ảnh trước"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>' +
+      '<button type="button" class="slide-nav next" id="detailNextBtn" aria-label="Ảnh sau"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>'
+    : '';
+
   var stockHtml = product.stock === false
     ? '<span class="badge-stock out">Hết hàng</span>'
     : '<span class="badge-stock in">Còn hàng</span>';
@@ -1022,7 +1027,7 @@ function renderProductDetail(root, product, cat) {
 
   root.innerHTML =
     '<div class="detail-gallery">' +
-      '<div class="detail-gallery-main" id="detailMainImage" style="' + mainStyle + '">' + badge + iconHtml + '</div>' +
+      '<div class="detail-gallery-main" id="detailMainImage" style="' + mainStyle + '">' + badge + iconHtml + galleryNavHtml + '</div>' +
       thumbsHtml +
     '</div>' +
     '<div class="detail-info">' +
@@ -1038,14 +1043,25 @@ function renderProductDetail(root, product, cat) {
     '</div>';
 
   if (galleryImages.length > 1) {
-    document.querySelectorAll('#detailThumbs .detail-thumb').forEach(function (thumb) {
-      thumb.addEventListener('click', function () {
-        document.querySelectorAll('#detailThumbs .detail-thumb').forEach(function (t) { t.classList.remove('active'); });
-        thumb.classList.add('active');
-        var idx = Number(thumb.dataset.index);
-        document.getElementById('detailMainImage').style.backgroundImage = "url('" + galleryImages[idx] + "')";
-      });
+    var currentImageIndex = 0;
+    var mainImageEl = document.getElementById('detailMainImage');
+    var thumbEls = document.querySelectorAll('#detailThumbs .detail-thumb');
+
+    function goToDetailImage(idx) {
+      currentImageIndex = (idx + galleryImages.length) % galleryImages.length;
+      mainImageEl.style.backgroundImage = "url('" + galleryImages[currentImageIndex] + "')";
+      thumbEls.forEach(function (t) { t.classList.remove('active'); });
+      thumbEls[currentImageIndex].classList.add('active');
+    }
+
+    thumbEls.forEach(function (thumb) {
+      thumb.addEventListener('click', function () { goToDetailImage(Number(thumb.dataset.index)); });
     });
+
+    var prevBtn = document.getElementById('detailPrevBtn');
+    var nextBtn = document.getElementById('detailNextBtn');
+    if (prevBtn) prevBtn.addEventListener('click', function () { goToDetailImage(currentImageIndex - 1); });
+    if (nextBtn) nextBtn.addEventListener('click', function () { goToDetailImage(currentImageIndex + 1); });
   }
 
   var zaloBtn = document.getElementById('detailZaloBtn');
