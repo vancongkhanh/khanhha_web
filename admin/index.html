@@ -235,6 +235,30 @@
   .pinfo-price .now{font-size:19px;font-weight:700;color:var(--copper);}
   .pinfo-price .old{font-size:13.5px;color:var(--muted);text-decoration:line-through;}
   .pinfo-price .pct{font-size:12px;font-weight:600;color:#fff;background:var(--copper);padding:2px 8px;border-radius:999px;}
+  .msg-attach-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
+  .msg-attach-thumb{width:88px;height:88px;object-fit:cover;border-radius:10px;border:1px solid var(--border);cursor:zoom-in;transition:opacity .15s;}
+  .msg-attach-thumb:hover{opacity:.85;}
+  .lightbox-overlay{z-index:120;background:rgba(10,14,13,.92);}
+  .lightbox-image{max-width:88vw;max-height:84vh;border-radius:8px;display:block;object-fit:contain;}
+  .lightbox-close{
+    position:fixed;top:20px;right:24px;background:rgba(255,255,255,.15);border:none;
+    width:38px;height:38px;border-radius:50%;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;
+  }
+  .lightbox-close:hover{background:rgba(255,255,255,.3);}
+  .lightbox-close svg{width:18px;height:18px;}
+  .lightbox-nav{
+    position:fixed;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;
+    background:rgba(255,255,255,.15);border:none;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;
+  }
+  .lightbox-nav:hover{background:rgba(255,255,255,.3);}
+  .lightbox-nav svg{width:20px;height:20px;}
+  .lightbox-nav.prev{left:24px;}
+  .lightbox-nav.next{right:24px;}
+  .lightbox-counter{
+    position:fixed;bottom:24px;left:50%;transform:translateX(-50%);color:#fff;font-size:13px;font-weight:600;
+    background:rgba(0,0,0,.35);padding:4px 12px;border-radius:999px;
+  }
+  @media (max-width:640px){.lightbox-nav.prev{left:8px;}.lightbox-nav.next{right:8px;}}
   .modal-head{display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--border);}
   .modal-head h3{font-size:17px;}
   .modal-close{background:none;border:none;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--muted);}
@@ -697,6 +721,21 @@
 <!-- Popup xem nhanh thông tin sản phẩm (mở từ link trong nội dung tin nhắn) -->
 <div class="modal-overlay" id="productInfoOverlay">
   <div class="modal-panel modal-sm" id="productInfoPanel"></div>
+</div>
+
+<!-- Lightbox xem ảnh khách gửi kèm tin nhắn -->
+<div class="modal-overlay lightbox-overlay" id="imgLightboxOverlay">
+  <button type="button" class="lightbox-close" onclick="adminCloseImageLightbox()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6L6 18"/></svg>
+  </button>
+  <button type="button" class="lightbox-nav prev" id="imgLightboxPrev" onclick="adminLightboxPrev()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+  </button>
+  <img class="lightbox-image" id="imgLightboxImage" src="" alt="Ảnh khách gửi">
+  <button type="button" class="lightbox-nav next" id="imgLightboxNext" onclick="adminLightboxNext()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+  </button>
+  <div class="lightbox-counter" id="imgLightboxCounter"></div>
 </div>
 
 <div class="toast" id="toast"></div>

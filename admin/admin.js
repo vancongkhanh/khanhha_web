@@ -99,6 +99,17 @@ function extractProductIdFromContent(content) {
   return match ? decodeURIComponent(match[1]) : null;
 }
 
+/**
+ * Danh sách ảnh đính kèm của 1 tin nhắn. Hiện tại form Liên hệ chỉ cho gửi
+ * 1 ảnh (field imageUrl), nhưng đọc thêm field images (mảng) nếu sau này
+ * mở rộng cho gửi nhiều ảnh — không cần sửa lại nơi hiển thị.
+ */
+function messageImageList(m) {
+  if (m.images && m.images.length) return m.images;
+  if (m.imageUrl) return [m.imageUrl];
+  return [];
+}
+
 function removeDiacritics(str) {
   return String(str || '')
     .normalize('NFD')
@@ -972,6 +983,13 @@ function openMessageDetail(id) {
   var productInfoBtnHtml = linkedProductId
     ? '<button type="button" class="btn btn-outline btn-sm" style="margin-top:10px;" onclick="event.stopPropagation();adminOpenProductInfo(\'' + linkedProductId + '\')">🔎 Xem thông tin sản phẩm</button>'
     : '';
+  var msgImages = messageImageList(m);
+  var attachHtml = msgImages.length
+    ? '<div style="margin-top:16px;"><label style="font-size:12.5px;font-weight:600;">Ảnh khách gửi kèm</label><div class="msg-attach-row">' +
+      msgImages.map(function (url, i) {
+        return '<img class="msg-attach-thumb" src="' + url + '" alt="Ảnh khách gửi" onclick="adminOpenMessageImage(\'' + m.id + '\',' + i + ')">';
+      }).join('') + '</div></div>'
+    : '';
 
   var panel = document.getElementById('drawerPanel');
   panel.innerHTML =
@@ -981,10 +999,7 @@ function openMessageDetail(id) {
     '<div class="detail-row"><span>Số điện thoại</span><span>' + escapeHtml(m.phone) + '</span></div>' +
     '<div class="detail-row"><span>Thời gian gửi</span><span>' + formatRelativeTime(m.createdAt) + '</span></div>' +
     '<div style="margin-top:16px;"><label style="font-size:12.5px;font-weight:600;">Nội dung khách gửi</label><p style="font-size:14px;margin-top:6px;line-height:1.6;white-space:pre-line;word-break:break-word;">' + linkifyText(m.content) + '</p>' + productInfoBtnHtml + '</div>' +
-    (m.imageUrl
-      ? '<div style="margin-top:16px;"><label style="font-size:12.5px;font-weight:600;">Ảnh khách gửi kèm</label>' +
-        '<a href="' + m.imageUrl + '" target="_blank" rel="noopener"><img src="' + m.imageUrl + '" alt="Ảnh khách gửi" style="width:100%;max-height:260px;object-fit:cover;border-radius:10px;margin-top:6px;display:block;"></a></div>'
-      : '') +
+    attachHtml +
     '<div style="margin-top:18px;"><label style="font-size:12.5px;font-weight:600;">Trạng thái</label><div class="status-select">' +
     '<div class="status-opt ' + (m.status === 'moi' ? 'selected new' : '') + '" onclick="adminSetMessageStatus(\'' + m.id + '\',\'moi\')">Mới</div>' +
     '<div class="status-opt ' + (m.status === 'da_lien_he' ? 'selected done' : '') + '" onclick="adminSetMessageStatus(\'' + m.id + '\',\'da_lien_he\')">Đã liên hệ</div>' +
@@ -1053,6 +1068,45 @@ function openProductInfoModal(id) {
 
 function closeProductInfoModal() { document.getElementById('productInfoOverlay').classList.remove('open'); }
 document.getElementById('productInfoOverlay').addEventListener('click', function (e) { if (e.target === this) closeProductInfoModal(); });
+
+/**
+ * Lightbox xem ảnh khách gửi kèm tin nhắn — thu nhỏ thumbnail trong Chi
+ * tiết tin nhắn, bấm vào mở popup ảnh lớn, có mũi tên chuyển ảnh khi
+ * tin nhắn có nhiều hơn 1 ảnh (xem messageImageList()).
+ */
+var lightboxImages = [];
+var lightboxIndex = 0;
+
+function openMessageImageLightbox(messageId, startIndex) {
+  var m = messagesCache.find(function (x) { return x.id === messageId; });
+  if (!m) return;
+  var images = messageImageList(m);
+  if (!images.length) return;
+  lightboxImages = images;
+  lightboxIndex = startIndex || 0;
+  renderLightbox();
+  document.getElementById('imgLightboxOverlay').classList.add('open');
+}
+
+function renderLightbox() {
+  document.getElementById('imgLightboxImage').src = lightboxImages[lightboxIndex];
+  var showNav = lightboxImages.length > 1;
+  document.getElementById('imgLightboxPrev').style.display = showNav ? 'flex' : 'none';
+  document.getElementById('imgLightboxNext').style.display = showNav ? 'flex' : 'none';
+  document.getElementById('imgLightboxCounter').textContent = showNav ? (lightboxIndex + 1) + ' / ' + lightboxImages.length : '';
+}
+
+function lightboxPrev() { lightboxIndex = (lightboxIndex - 1 + lightboxImages.length) % lightboxImages.length; renderLightbox(); }
+function lightboxNext() { lightboxIndex = (lightboxIndex + 1) % lightboxImages.length; renderLightbox(); }
+function closeImageLightbox() { document.getElementById('imgLightboxOverlay').classList.remove('open'); }
+
+document.getElementById('imgLightboxOverlay').addEventListener('click', function (e) { if (e.target === this) closeImageLightbox(); });
+document.addEventListener('keydown', function (e) {
+  if (!document.getElementById('imgLightboxOverlay').classList.contains('open')) return;
+  if (e.key === 'Escape') closeImageLightbox();
+  else if (e.key === 'ArrowLeft') lightboxPrev();
+  else if (e.key === 'ArrowRight') lightboxNext();
+});
 
 function setMessageStatus(id, status) {
   showToast('Đang cập nhật...');
@@ -1579,6 +1633,10 @@ window.adminGoToNewMessages = goToNewMessages;
 window.adminGoToMessageDetail = goToMessageDetail;
 window.adminOpenProductInfo = openProductInfoModal;
 window.adminCloseProductInfo = closeProductInfoModal;
+window.adminOpenMessageImage = openMessageImageLightbox;
+window.adminCloseImageLightbox = closeImageLightbox;
+window.adminLightboxPrev = lightboxPrev;
+window.adminLightboxNext = lightboxNext;
 window.saveSettingsAppearance = saveSettingsAppearance;
 window.saveSettingsStore = saveSettingsStore;
 window.saveSettingsLinks = saveSettingsLinks;
