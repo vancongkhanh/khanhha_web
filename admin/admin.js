@@ -69,6 +69,24 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+/**
+ * Thoát HTML rồi biến các URL dạng chữ thường (http/https) trong nội dung
+ * tin nhắn thành link bấm được, mở tab mới — dùng cho nội dung khách gửi
+ * qua form Liên hệ (thường kèm link sản phẩm khách đang hỏi).
+ */
+function linkifyText(str) {
+  var escaped = escapeHtml(str);
+  return escaped.replace(/(https?:\/\/[^\s<]+)/g, function (url) {
+    var trailing = '';
+    var trailingMatch = url.match(/[.,;:)\]]+$/);
+    if (trailingMatch) {
+      trailing = trailingMatch[0];
+      url = url.slice(0, -trailing.length);
+    }
+    return '<a href="' + url + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">' + url + '</a>' + trailing;
+  });
+}
+
 function formatVND(n) { return Number(n || 0).toLocaleString('vi-VN') + '₫'; }
 
 function removeDiacritics(str) {
@@ -916,13 +934,22 @@ function renderRecentMessages() {
   var list = document.getElementById('recentMessagesList');
   if (!list) return;
   list.innerHTML = messagesCache.slice(0, 2).map(function (m) {
-    return '<div class="msg-item">' +
+    return '<div class="msg-item clickable-row" onclick="adminGoToMessageDetail(\'' + m.id + '\')">' +
       '<div class="msg-avatar">' + escapeHtml((m.name || '?').charAt(0)) + '</div>' +
       '<div class="msg-body">' +
       '<div class="msg-top"><span class="name">' + escapeHtml(m.name) + '</span><span class="time">' + formatRelativeTime(m.createdAt) + '</span></div>' +
       '<div class="msg-content">' + escapeHtml(m.content) + '</div>' +
       '</div></div>';
   }).join('') || '<p class="hint">Chưa có tin nhắn nào.</p>';
+}
+
+/**
+ * Bấm 1 tin nhắn ở khối "Tin nhắn gần đây" trên Tổng quan -> chuyển sang
+ * trang Hộp thư và mở luôn khung chi tiết của đúng tin nhắn đó.
+ */
+function goToMessageDetail(id) {
+  showPage('messages');
+  openMessageDetail(id);
 }
 
 function openMessageDetail(id) {
@@ -939,7 +966,7 @@ function openMessageDetail(id) {
     '<div class="detail-row"><span>Khách hàng</span><span>' + escapeHtml(m.name) + '</span></div>' +
     '<div class="detail-row"><span>Số điện thoại</span><span>' + escapeHtml(m.phone) + '</span></div>' +
     '<div class="detail-row"><span>Thời gian gửi</span><span>' + formatRelativeTime(m.createdAt) + '</span></div>' +
-    '<div style="margin-top:16px;"><label style="font-size:12.5px;font-weight:600;">Nội dung khách gửi</label><p style="font-size:14px;margin-top:6px;line-height:1.6;">' + escapeHtml(m.content) + '</p></div>' +
+    '<div style="margin-top:16px;"><label style="font-size:12.5px;font-weight:600;">Nội dung khách gửi</label><p style="font-size:14px;margin-top:6px;line-height:1.6;white-space:pre-line;word-break:break-word;">' + linkifyText(m.content) + '</p></div>' +
     (m.imageUrl
       ? '<div style="margin-top:16px;"><label style="font-size:12.5px;font-weight:600;">Ảnh khách gửi kèm</label>' +
         '<a href="' + m.imageUrl + '" target="_blank" rel="noopener"><img src="' + m.imageUrl + '" alt="Ảnh khách gửi" style="width:100%;max-height:260px;object-fit:cover;border-radius:10px;margin-top:6px;display:block;"></a></div>'
@@ -1486,6 +1513,7 @@ window.adminSaveMessageNote = saveMessageNote;
 window.showPage = showPage;
 window.adminGoToOutOfStock = goToOutOfStock;
 window.adminGoToNewMessages = goToNewMessages;
+window.adminGoToMessageDetail = goToMessageDetail;
 window.saveSettingsAppearance = saveSettingsAppearance;
 window.saveSettingsStore = saveSettingsStore;
 window.saveSettingsLinks = saveSettingsLinks;
