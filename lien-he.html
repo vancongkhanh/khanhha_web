@@ -105,16 +105,22 @@
       <h2 style="font-size:22px;margin-bottom:16px;">Gửi tin nhắn cho Khánh Hà</h2>
       <form class="contact-form" id="contactForm">
         <div>
-          <label for="name">Họ và tên</label>
-          <input id="name" type="text" placeholder="Tên của bạn">
+          <label for="name">Họ và tên <span class="req">*</span></label>
+          <input id="name" type="text" placeholder="Tên của bạn" required>
         </div>
         <div>
-          <label for="phone">Số điện thoại / Zalo</label>
-          <input id="phone" type="tel" placeholder="Số điện thoại/Zalo của bạn">
+          <label for="phone">Số điện thoại / Zalo <span class="req">*</span></label>
+          <input id="phone" type="tel" placeholder="Số điện thoại/Zalo của bạn" required>
         </div>
         <div>
-          <label for="message">Nội dung</label>
-          <textarea id="message" placeholder="Bạn cần đặt sản phẩm gì, hoặc muốn hỏi điều gì?"></textarea>
+          <label for="message">Nội dung <span class="req">*</span></label>
+          <div class="msg-quick-options" id="msgQuickOptions">
+            <button type="button" class="msg-quick-btn" data-text="Cho em hỏi giá sản phẩm này ạ?">Hỏi giá</button>
+            <button type="button" class="msg-quick-btn" data-text="Sản phẩm này còn hàng không ạ?">Còn hàng không?</button>
+            <button type="button" class="msg-quick-btn" data-text="Cho em hỏi phí và thời gian giao hàng ạ?">Phí giao hàng</button>
+            <button type="button" class="msg-quick-btn" data-text="Em muốn đặt mua, anh/chị hướng dẫn giúp em ạ?">Muốn đặt mua</button>
+          </div>
+          <textarea id="message" placeholder="Bạn cần đặt sản phẩm gì, hoặc muốn hỏi điều gì?" required></textarea>
         </div>
         <div>
           <label for="contactImage">Ảnh đính kèm (không bắt buộc)</label>

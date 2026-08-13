@@ -408,6 +408,14 @@
 }
 .contact-form textarea{min-height:110px;resize:vertical;}
 .contact-form .btn{align-self:flex-start;margin-top:4px;}
+.contact-form label .req{color:#b3432b;}
+.msg-quick-options{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;}
+.msg-quick-btn{
+  padding:6px 14px;border-radius:999px;font-size:12.5px;font-weight:600;cursor:pointer;
+  background:var(--card);border:1.5px solid rgba(31,59,44,.15);color:var(--ink);
+}
+.msg-quick-btn:hover{border-color:var(--copper);color:var(--copper);}
+.msg-quick-btn.active{background:var(--copper);color:#fff;border-color:var(--copper);}
 .form-status{font-size:13px;font-weight:600;min-height:1em;}
 .form-status.success{color:var(--pine);}
 .form-status.error{color:#b3432b;}

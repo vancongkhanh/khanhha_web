@@ -1025,6 +1025,13 @@ function renderProductDetail(root, product, cat) {
     : '<span class="badge-stock in">Còn hàng</span>';
   var descHtml = product.description ? escapeHtml(product.description) : 'Đang cập nhật mô tả cho sản phẩm này.';
 
+  var detailPriceMode = getPriceDisplayMode();
+  var detailPriceLine = detailPriceMode === 'show' ? formatPrice(product.price) : (detailPriceMode === 'contact' ? 'Liên hệ giá' : '');
+  var prefillMessageLines = ['Tôi muốn hỏi về sản phẩm: ' + product.name];
+  if (detailPriceLine) prefillMessageLines.push('Giá: ' + detailPriceLine);
+  prefillMessageLines.push(window.location.href);
+  var messageFormHref = 'lien-he.html?msg=' + encodeURIComponent(prefillMessageLines.join('\n')) + '#contactForm';
+
   root.innerHTML =
     '<div class="detail-gallery">' +
       '<div class="detail-gallery-main" id="detailMainImage" style="' + mainStyle + '">' + badge + iconHtml + galleryNavHtml + '</div>' +
@@ -1039,6 +1046,7 @@ function renderProductDetail(root, product, cat) {
       '<div class="detail-cta">' +
         '<a class="btn btn-primary" id="detailZaloBtn" href="' + (SITE_CONFIG.links.zaloPersonal || 'https://zalo.me/0898999039') + '" target="_blank" rel="noopener">Nhắn Zalo đặt hàng</a>' +
         '<a class="btn btn-outline" id="detailCallBtn" href="' + (SITE_CONFIG.store.phoneHref || 'tel:0898999039') + '">Gọi ngay</a>' +
+        '<a class="btn btn-outline" href="' + messageFormHref + '">Gửi tin nhắn</a>' +
       '</div>' +
     '</div>';
 
@@ -1141,6 +1149,31 @@ function initContactForm() {
   var submitBtn = form.querySelector('button[type="submit"]');
   var imageInput = document.getElementById('contactImage');
   var imagePreviewName = document.getElementById('contactImagePreviewName');
+  var messageInput = document.getElementById('message');
+
+  // Đến từ nút "Gửi tin nhắn" ở trang chi tiết sản phẩm (?msg=...) thì điền
+  // sẵn nội dung hỏi mua, khách chỉ cần bổ sung họ tên + số điện thoại.
+  var prefillMsg = new URLSearchParams(window.location.search).get('msg');
+  if (prefillMsg && messageInput) {
+    messageInput.value = prefillMsg;
+  }
+
+  // Các gợi ý chọn nhanh — bấm để thêm/bỏ 1 dòng câu hỏi mẫu vào nội dung,
+  // giúp khách không phải tự gõ những câu hỏi thường gặp.
+  document.querySelectorAll('.msg-quick-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      if (!messageInput) return;
+      var phrase = btn.dataset.text;
+      var value = messageInput.value;
+      if (value.indexOf(phrase) !== -1) {
+        messageInput.value = value.replace('\n' + phrase, '').replace(phrase, '');
+        btn.classList.remove('active');
+      } else {
+        messageInput.value = value ? value + '\n' + phrase : phrase;
+        btn.classList.add('active');
+      }
+    });
+  });
 
   if (imageInput) {
     imageInput.addEventListener('change', function () {
