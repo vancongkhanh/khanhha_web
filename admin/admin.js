@@ -636,25 +636,41 @@ function renderProductImageSlots() {
   }
 }
 
-function uploadProductImageFile(file) {
-  if (modalProductImages.length >= 4) { showToast('Tối đa 4 ảnh mỗi sản phẩm'); return; }
-  if (!file || file.type.indexOf('image/') !== 0) { showToast('Vui lòng chọn file ảnh'); return; }
-  showToast('Đang tải ảnh lên...');
-  uploadToStorage('products', file).then(function (url) {
+function uploadProductImageFile(file, silent) {
+  if (modalProductImages.length >= 4) { showToast('Tối đa 4 ảnh mỗi sản phẩm'); return Promise.resolve(); }
+  if (!file || file.type.indexOf('image/') !== 0) { showToast('Vui lòng chọn file ảnh'); return Promise.resolve(); }
+  if (!silent) showToast('Đang tải ảnh lên...');
+  return uploadToStorage('products', file).then(function (url) {
     modalProductImages.push(url);
     renderProductImageSlots();
-    showToast('Đã tải ảnh lên');
+    if (!silent) showToast('Đã tải ảnh lên');
   }).catch(function (err) {
     console.error(err);
     showToast('Tải ảnh thất bại, thử lại');
   });
 }
 
+/**
+ * Kéo-thả hoặc chọn cùng lúc nhiều ảnh — tải TUẦN TỰ từng ảnh một (chờ ảnh
+ * trước xong mới tải ảnh sau) để luôn tôn trọng đúng giới hạn 4 ảnh/sản
+ * phẩm. Trước đây chỉ lấy files[0] nên kéo nhiều ảnh chỉ thêm được 1 ảnh.
+ */
+function uploadProductImageFiles(fileList) {
+  var files = Array.prototype.slice.call(fileList || []);
+  if (!files.length) return;
+  var multi = files.length > 1;
+  if (multi) showToast('Đang tải ' + files.length + ' ảnh lên...');
+  files.reduce(function (chain, file) {
+    return chain.then(function () { return uploadProductImageFile(file, multi); });
+  }, Promise.resolve()).then(function () {
+    if (multi) showToast('Đã tải ảnh lên');
+  });
+}
+
 function handleProductImageDrop(e) {
   e.preventDefault();
   e.currentTarget.classList.remove('drag-over');
-  var file = e.dataTransfer.files && e.dataTransfer.files[0];
-  uploadProductImageFile(file);
+  uploadProductImageFiles(e.dataTransfer.files);
 }
 
 function removeProductImage(idx) {
@@ -693,9 +709,9 @@ function uploadToStorage(pathPrefix, file) {
 }
 
 document.getElementById('pf-image-file').addEventListener('change', function (e) {
-  var file = e.target.files[0];
+  var files = e.target.files;
   e.target.value = '';
-  uploadProductImageFile(file);
+  uploadProductImageFiles(files);
 });
 
 function saveProduct(id, btn) {
