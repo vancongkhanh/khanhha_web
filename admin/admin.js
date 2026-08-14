@@ -951,18 +951,56 @@ function goToNewMessages() {
   renderMessages();
 }
 
+var dashboardMsgPage = 1;
+var dashboardMsgPageSize = 10;
+
+function renderDashboardMessagesPagination(totalItems) {
+  var container = document.getElementById('recentMessagesPagination');
+  if (!container) return;
+  var totalPages = Math.max(1, Math.ceil(totalItems / dashboardMsgPageSize));
+  if (dashboardMsgPage > totalPages) dashboardMsgPage = totalPages;
+  if (dashboardMsgPage < 1) dashboardMsgPage = 1;
+  container.innerHTML =
+    '<button class="page-btn" ' + (dashboardMsgPage <= 1 ? 'disabled' : '') + ' onclick="adminGoToDashboardMsgPage(' + (dashboardMsgPage - 1) + ')">‹ Trước</button>' +
+    '<span class="page-info">Trang ' + dashboardMsgPage + ' / ' + totalPages + '</span>' +
+    '<button class="page-btn" ' + (dashboardMsgPage >= totalPages ? 'disabled' : '') + ' onclick="adminGoToDashboardMsgPage(' + (dashboardMsgPage + 1) + ')">Sau ›</button>';
+}
+
+function goToDashboardMsgPage(page) {
+  dashboardMsgPage = page;
+  renderRecentMessages();
+}
+
 function renderRecentMessages() {
   var list = document.getElementById('recentMessagesList');
   if (!list) return;
-  list.innerHTML = messagesCache.slice(0, 2).map(function (m) {
+
+  var newMessages = messagesCache.filter(function (m) { return m.status === 'moi'; });
+  renderDashboardMessagesPagination(newMessages.length);
+
+  if (!newMessages.length) {
+    list.innerHTML = '<p class="hint">Chưa có tin nhắn mới nào.</p>';
+    return;
+  }
+
+  var startIdx = (dashboardMsgPage - 1) * dashboardMsgPageSize;
+  var pageItems = newMessages.slice(startIdx, startIdx + dashboardMsgPageSize);
+
+  list.innerHTML = pageItems.map(function (m) {
     return '<div class="msg-item clickable-row" onclick="adminGoToMessageDetail(\'' + m.id + '\')">' +
       '<div class="msg-avatar">' + escapeHtml((m.name || '?').charAt(0)) + '</div>' +
       '<div class="msg-body">' +
       '<div class="msg-top"><span class="name">' + escapeHtml(m.name) + '</span><span class="time">' + formatRelativeTime(m.createdAt) + '</span></div>' +
       '<div class="msg-content">' + escapeHtml(m.content) + '</div>' +
       '</div></div>';
-  }).join('') || '<p class="hint">Chưa có tin nhắn nào.</p>';
+  }).join('');
 }
+
+document.getElementById('dfilter-pagesize').addEventListener('change', function () {
+  dashboardMsgPageSize = Number(this.value) || 10;
+  dashboardMsgPage = 1;
+  renderRecentMessages();
+});
 
 /**
  * Bấm 1 tin nhắn ở khối "Tin nhắn gần đây" trên Tổng quan -> chuyển sang
@@ -1634,6 +1672,7 @@ window.adminSaveProduct = saveProduct;
 window.adminToggleProductField = toggleProductField;
 window.adminGoToProductPage = goToProductPage;
 window.adminGoToMessagePage = goToMessagePage;
+window.adminGoToDashboardMsgPage = goToDashboardMsgPage;
 window.adminRemoveProductImage = removeProductImage;
 window.adminHandleProductImageDrop = handleProductImageDrop;
 window.adminUpdateHeroCaption = updateHeroCaption;

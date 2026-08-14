@@ -524,10 +524,22 @@
 
       <div class="card" style="padding:22px;">
         <div class="section-head">
-          <div><h3 style="font-size:16px;">Tin nhắn gần đây</h3><p>Khách hỏi qua form Liên hệ trên web</p></div>
+          <div><h3 style="font-size:16px;">Tin nhắn mới</h3><p>Khách hỏi qua form Liên hệ trên web, chưa liên hệ lại</p></div>
           <span class="btn-ghost" onclick="showPage('messages')" style="cursor:pointer;">Xem hộp thư →</span>
         </div>
         <div id="recentMessagesList"></div>
+        <div class="pagination-bar">
+          <div class="page-size-select">
+            <label for="dfilter-pagesize">Số dòng/trang</label>
+            <select id="dfilter-pagesize">
+              <option value="10">10</option>
+              <option value="20">20</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </div>
+          <div class="pagination-controls" id="recentMessagesPagination"></div>
+        </div>
       </div>
     </div>
 
