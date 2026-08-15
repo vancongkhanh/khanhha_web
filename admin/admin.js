@@ -341,6 +341,7 @@ function listenChatSessions() {
       chatSessionsCache = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
       renderChatSessions();
       renderChatbotNoResultsSummary();
+      updateDashboardStats();
       var navCount = document.getElementById('navCountChatSessions');
       if (navCount) navCount.textContent = chatSessionsCache.length;
       if (firstLoad) { firstLoad = false; resolveFirstLoad(); }
@@ -1389,6 +1390,8 @@ function updateDashboardStats() {
     els[2].textContent = categoriesCache.length;
     els[3].textContent = messagesCache.filter(function (m) { return m.status === 'moi'; }).length;
   }
+  var statChatSessions = document.getElementById('statChatSessions');
+  if (statChatSessions) statChatSessions.textContent = chatSessionsCache.length;
   var newMessagesCount = messagesCache.filter(function (m) { return m.status === 'moi'; }).length;
   var navProducts = document.getElementById('navCountProducts');
   var navCategories = document.getElementById('navCountCategories');
