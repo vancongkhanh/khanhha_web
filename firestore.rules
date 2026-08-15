@@ -30,5 +30,13 @@ service cloud.firestore {
       allow create: if true;
       allow read, update, delete: if isAdmin();
     }
+
+    // Sự kiện chatbot (khách dùng widget chat, không cần đăng nhập) — ghi
+    // công khai để widget tạo/nối thêm sự kiện vào phiên của chính khách
+    // đó, chỉ admin mới đọc được để xem lại trong trang quản trị.
+    match /chatSessions/{sessionId} {
+      allow create, update: if true;
+      allow read, delete: if isAdmin();
+    }
   }
 }

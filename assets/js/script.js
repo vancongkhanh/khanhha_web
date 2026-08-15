@@ -10,7 +10,7 @@
 
 import { db, storage } from './firebase-init.js';
 import {
-  collection, getDocs, getDoc, doc, query, where, orderBy, addDoc, serverTimestamp
+  collection, getDocs, getDoc, doc, query, where, orderBy, addDoc, setDoc, serverTimestamp, arrayUnion
 } from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js';
 import {
   ref, uploadBytes, getDownloadURL
@@ -138,6 +138,7 @@ document.addEventListener('DOMContentLoaded', function () {
   initProductsPageData();
   initProductDetailPage();
   initGalleryPageData();
+  initChatbot();
 });
 
 /**
@@ -1261,4 +1262,444 @@ function initContactForm() {
       if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = submitBtnDefaultText; }
     });
   });
+}
+
+/* =======================================================================
+   CHATBOT TRỢ LÝ — widget nổi ở mọi trang khách: tìm sản phẩm, địa chỉ,
+   Zalo, Facebook, gửi tin nhắn. Không dùng AI — chỉ so khớp từ khoá +
+   menu nút bấm, dữ liệu đọc thẳng từ Firestore (products/settings).
+   Lưu lịch sử hội thoại vào localStorage (per-thiết bị) và ghi lại các
+   sự kiện chính vào collection "chatSessions" để chủ shop xem trong Admin.
+   ======================================================================= */
+
+var CHATBOT_STORAGE_KEY = 'khanhha_chatbot_v1';
+var CHATBOT_SESSION_KEY = 'khanhha_chatbot_session_v1';
+var CHATBOT_HISTORY_MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000;
+var CHATBOT_SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+
+var chatbotStep = 'menu';
+var chatbotCategoriesCache = null;
+var chatbotProductsCache = null;
+var chatbotSessionId = null;
+var chatbotSessionIsNew = false;
+
+function chatbotGetProducts() {
+  if (chatbotProductsCache) return Promise.resolve(chatbotProductsCache);
+  return fetchProducts().then(function (products) { chatbotProductsCache = products; return products; });
+}
+
+function chatbotGetCategories() {
+  if (chatbotCategoriesCache) return Promise.resolve(chatbotCategoriesCache);
+  return fetchCategories().then(function (categories) { chatbotCategoriesCache = categories; return categories; });
+}
+
+function loadChatbotHistory() {
+  try {
+    var raw = localStorage.getItem(CHATBOT_STORAGE_KEY);
+    if (!raw) return null;
+    var data = JSON.parse(raw);
+    if (!data || !data.updatedAt || Date.now() - data.updatedAt > CHATBOT_HISTORY_MAX_AGE_MS) return null;
+    return data;
+  } catch (e) {
+    return null;
+  }
+}
+
+function saveChatbotHistory() {
+  try {
+    var messagesEl = document.getElementById('chatbotMessages');
+    localStorage.setItem(CHATBOT_STORAGE_KEY, JSON.stringify({
+      html: messagesEl ? messagesEl.innerHTML : '',
+      step: chatbotStep,
+      updatedAt: Date.now()
+    }));
+  } catch (e) { /* Bỏ qua nếu localStorage đầy hoặc bị chặn (chế độ ẩn danh) */ }
+}
+
+/**
+ * Mỗi thiết bị giữ 1 sessionId trong 30 ngày để các lượt ghé web sau vẫn
+ * gộp chung 1 phiên chatSessions trong Admin, không tạo phiên mới liên tục.
+ */
+function getOrCreateChatbotSessionId() {
+  try {
+    var raw = localStorage.getItem(CHATBOT_SESSION_KEY);
+    if (raw) {
+      var data = JSON.parse(raw);
+      if (data && data.id && Date.now() - data.createdAt < CHATBOT_SESSION_MAX_AGE_MS) {
+        return data.id;
+      }
+    }
+  } catch (e) { /* rơi xuống tạo phiên mới */ }
+  var id = 'cs_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+  try {
+    localStorage.setItem(CHATBOT_SESSION_KEY, JSON.stringify({ id: id, createdAt: Date.now() }));
+  } catch (e) { /* ignore */ }
+  chatbotSessionIsNew = true;
+  return id;
+}
+
+function logChatbotEvent(event) {
+  if (!chatbotSessionId) return;
+  event.at = new Date().toISOString();
+  var payload = { updatedAt: serverTimestamp(), events: arrayUnion(event) };
+  if (chatbotSessionIsNew) {
+    payload.startedAt = serverTimestamp();
+    chatbotSessionIsNew = false;
+  }
+  setDoc(doc(db, 'chatSessions', chatbotSessionId), payload, { merge: true }).catch(function (err) {
+    console.error('Không ghi được sự kiện chatbot:', err);
+  });
+}
+
+function appendChatbotMessage(from, html) {
+  var list = document.getElementById('chatbotMessages');
+  if (!list) return;
+  var div = document.createElement('div');
+  div.className = 'chatbot-msg ' + from;
+  div.innerHTML = html;
+  list.appendChild(div);
+  list.scrollTop = list.scrollHeight;
+  saveChatbotHistory();
+}
+
+function appendChatbotBot(text) { appendChatbotMessage('bot', escapeHtml(text)); }
+function appendChatbotUser(text) { appendChatbotMessage('user', escapeHtml(text)); }
+
+function appendChatbotProductCards(products) {
+  var list = document.getElementById('chatbotMessages');
+  if (!list) return;
+  var mode = getPriceDisplayMode();
+  products.forEach(function (p) {
+    var hasImage = p.images && p.images.length > 0;
+    var thumbStyle = hasImage ? "background-image:url('" + storagePathToUrl(p.images[0]) + "');" : '';
+    var priceHtml = '';
+    if (mode === 'show') priceHtml = '<span class="price">' + formatPrice(p.price) + '</span>';
+    else if (mode === 'contact') priceHtml = '<span class="price contact">Liên hệ giá</span>';
+
+    var a = document.createElement('a');
+    a.className = 'chatbot-product-card';
+    a.href = 'san-pham-chi-tiet.html?id=' + encodeURIComponent(p.id);
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.innerHTML =
+      '<div class="chatbot-product-thumb" style="' + thumbStyle + '"></div>' +
+      '<div class="chatbot-product-info"><span class="name">' + escapeHtml(p.name) + '</span>' + priceHtml + '</div>';
+    a.addEventListener('click', function () {
+      logChatbotEvent({ type: 'product_click', productId: p.id, productName: p.name });
+    });
+    list.appendChild(a);
+  });
+  list.scrollTop = list.scrollHeight;
+  saveChatbotHistory();
+}
+
+function renderChatbotQuickReplies(buttons) {
+  var wrap = document.getElementById('chatbotQuickReplies');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  (buttons || []).forEach(function (b) {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'chatbot-qr-btn' + (b.primary ? ' primary' : '');
+    btn.textContent = b.label;
+    btn.addEventListener('click', b.onClick);
+    wrap.appendChild(btn);
+  });
+}
+
+function toggleChatbotInput(show, placeholder) {
+  var row = document.getElementById('chatbotInputRow');
+  if (!row) return;
+  row.style.display = show ? 'flex' : 'none';
+  var input = document.getElementById('chatbotSearchInput');
+  if (input && placeholder) input.placeholder = placeholder;
+}
+
+function chatbotMainMenuButtons() {
+  return [
+    { label: '🔍 Tìm sản phẩm', onClick: chatbotGoSearch },
+    { label: '📍 Địa chỉ & giờ mở cửa', onClick: chatbotGoAddress },
+    { label: '💬 Nhắn Zalo', onClick: chatbotGoZalo },
+    { label: '📘 Xem Facebook', onClick: chatbotGoFacebook },
+    { label: '✉️ Gửi tin nhắn cho shop', onClick: chatbotGoContact }
+  ];
+}
+
+function chatbotCategoriesToButtons(categories) {
+  return categories.map(function (c) {
+    return { label: c.name, onClick: function () { chatbotGoCategory(c); } };
+  });
+}
+
+function chatbotSearchButtons() {
+  var catButtons = chatbotCategoriesCache ? chatbotCategoriesToButtons(chatbotCategoriesCache) : [];
+  return catButtons.concat([{ label: '⬅ Quay lại menu', onClick: chatbotBackToMenu }]);
+}
+
+function chatbotPostSearchButtons() {
+  return [{ label: '🔍 Tìm tiếp', onClick: chatbotGoSearch }, { label: '⬅ Quay lại menu', onClick: chatbotBackToMenu }];
+}
+
+function chatbotAddressButtons() {
+  return [
+    { label: '🗺 Xem bản đồ', onClick: function () {
+        logChatbotEvent({ type: 'external_click', target: 'maps' });
+        window.open('lien-he.html', '_blank', 'noopener');
+      } },
+    { label: '⬅ Quay lại menu', onClick: chatbotBackToMenu }
+  ];
+}
+
+function chatbotZaloButtons() {
+  return [
+    { label: '💬 Mở Zalo', primary: true, onClick: function () {
+        logChatbotEvent({ type: 'external_click', target: 'zalo' });
+        window.open((SITE_CONFIG.links && SITE_CONFIG.links.zaloPersonal) || 'https://zalo.me/0898999039', '_blank', 'noopener');
+      } },
+    { label: '⬅ Quay lại menu', onClick: chatbotBackToMenu }
+  ];
+}
+
+function chatbotFacebookButtons() {
+  return [
+    { label: '📘 Mở Facebook', primary: true, onClick: function () {
+        logChatbotEvent({ type: 'external_click', target: 'facebook' });
+        window.open((SITE_CONFIG.links && SITE_CONFIG.links.facebook) || 'https://www.facebook.com/profile.php?id=61556893695042', '_blank', 'noopener');
+      } },
+    { label: '⬅ Quay lại menu', onClick: chatbotBackToMenu }
+  ];
+}
+
+function chatbotContactButtons() {
+  return [
+    { label: '✉️ Điền form liên hệ', primary: true, onClick: function () {
+        logChatbotEvent({ type: 'external_click', target: 'contact_form' });
+        window.location.href = 'lien-he.html#contactForm';
+      } },
+    { label: '⬅ Quay lại menu', onClick: chatbotBackToMenu }
+  ];
+}
+
+function chatbotBackToMenu() {
+  appendChatbotUser('⬅ Quay lại menu');
+  chatbotStep = 'menu';
+  appendChatbotBot('Bạn cần mình giúp gì tiếp không?');
+  toggleChatbotInput(false);
+  renderChatbotQuickReplies(chatbotMainMenuButtons());
+}
+
+function chatbotGoSearch() {
+  appendChatbotUser('🔍 Tìm sản phẩm');
+  logChatbotEvent({ type: 'menu_click', label: 'Tìm sản phẩm' });
+  chatbotStep = 'search';
+  appendChatbotBot('Gõ tên sản phẩm cần tìm, hoặc chọn 1 danh mục bên dưới nhé.');
+  toggleChatbotInput(true, 'Nhập tên sản phẩm...');
+  renderChatbotQuickReplies(chatbotSearchButtons());
+  if (!chatbotCategoriesCache) {
+    chatbotGetCategories().then(function () {
+      if (chatbotStep === 'search') renderChatbotQuickReplies(chatbotSearchButtons());
+    });
+  }
+}
+
+function chatbotGoCategory(cat) {
+  appendChatbotUser(cat.name);
+  logChatbotEvent({ type: 'category_click', category: cat.slug });
+  appendChatbotBot('Mình mở danh mục "' + cat.name + '" ở tab mới cho bạn nhé.');
+  window.open('san-pham.html?cat=' + encodeURIComponent(cat.slug), '_blank', 'noopener');
+  chatbotStep = 'postSearch';
+  toggleChatbotInput(false);
+  renderChatbotQuickReplies(chatbotPostSearchButtons());
+}
+
+function chatbotRunSearch(rawQuery) {
+  var queryText = (rawQuery || '').trim();
+  if (!queryText) return;
+  appendChatbotUser(queryText);
+
+  var qNorm = removeDiacritics(queryText);
+  chatbotGetProducts().then(function (products) {
+    var matches = products.filter(function (p) { return removeDiacritics(p.name).indexOf(qNorm) !== -1; });
+    logChatbotEvent({ type: 'search', query: queryText, resultsCount: matches.length });
+
+    if (!matches.length) {
+      appendChatbotBot('Mình chưa tìm thấy sản phẩm này 😢 Bạn xem toàn bộ sản phẩm hoặc nhắn Zalo để shop tư vấn trực tiếp nhé.');
+      chatbotStep = 'postSearch';
+      toggleChatbotInput(false);
+      renderChatbotQuickReplies([
+        { label: 'Xem tất cả sản phẩm', onClick: function () { window.open('san-pham.html', '_blank', 'noopener'); } },
+        { label: 'Nhắn Zalo hỏi trực tiếp', onClick: chatbotGoZalo },
+        { label: '⬅ Quay lại menu', onClick: chatbotBackToMenu }
+      ]);
+      return;
+    }
+
+    var shown = matches.slice(0, 5);
+    appendChatbotBot('Mình tìm được ' + matches.length + ' sản phẩm khớp với "' + queryText + '":');
+    appendChatbotProductCards(shown);
+    toggleChatbotInput(false);
+
+    if (matches.length > 5) {
+      chatbotStep = 'postSearch';
+      renderChatbotQuickReplies([
+        { label: 'Xem tất cả ' + matches.length + ' kết quả →', onClick: function () { window.open('san-pham.html?q=' + encodeURIComponent(queryText), '_blank', 'noopener'); } },
+        { label: '🔍 Tìm tiếp', onClick: chatbotGoSearch },
+        { label: '⬅ Quay lại menu', onClick: chatbotBackToMenu }
+      ]);
+    } else {
+      chatbotStep = 'postSearch';
+      renderChatbotQuickReplies(chatbotPostSearchButtons());
+    }
+  }).catch(function (err) {
+    console.error('Lỗi tìm sản phẩm (chatbot):', err);
+    appendChatbotBot('Có lỗi khi tìm sản phẩm, vui lòng thử lại sau.');
+    chatbotStep = 'postSearch';
+    toggleChatbotInput(false);
+    renderChatbotQuickReplies(chatbotPostSearchButtons());
+  });
+}
+
+function chatbotGoAddress() {
+  appendChatbotUser('📍 Địa chỉ & giờ mở cửa');
+  logChatbotEvent({ type: 'menu_click', label: 'Địa chỉ & giờ mở cửa' });
+  var store = SITE_CONFIG.store || {};
+  var lines = [];
+  lines.push('📍 ' + (store.address || '') + (store.addressNote ? ' ' + store.addressNote : ''));
+  lines.push('🕐 ' + (store.hoursWeekday || ''));
+  if (store.hoursSunday) lines.push(store.hoursSunday);
+  appendChatbotBot(lines.join('\n'));
+  chatbotStep = 'address';
+  toggleChatbotInput(false);
+  renderChatbotQuickReplies(chatbotAddressButtons());
+}
+
+function chatbotGoZalo() {
+  appendChatbotUser('💬 Nhắn Zalo');
+  logChatbotEvent({ type: 'menu_click', label: 'Nhắn Zalo' });
+  appendChatbotBot('Bấm nút bên dưới để nhắn Zalo trực tiếp cho Khánh Hà nhé.');
+  chatbotStep = 'zalo';
+  toggleChatbotInput(false);
+  renderChatbotQuickReplies(chatbotZaloButtons());
+}
+
+function chatbotGoFacebook() {
+  appendChatbotUser('📘 Xem Facebook');
+  logChatbotEvent({ type: 'menu_click', label: 'Xem Facebook' });
+  appendChatbotBot('Bấm nút bên dưới để ghé trang Facebook của Khánh Hà nhé.');
+  chatbotStep = 'facebook';
+  toggleChatbotInput(false);
+  renderChatbotQuickReplies(chatbotFacebookButtons());
+}
+
+function chatbotGoContact() {
+  appendChatbotUser('✉️ Gửi tin nhắn cho shop');
+  logChatbotEvent({ type: 'menu_click', label: 'Gửi tin nhắn cho shop' });
+  appendChatbotBot('Bạn để lại tin nhắn ở form Liên hệ, Khánh Hà sẽ phản hồi sớm nhé.');
+  chatbotStep = 'contact';
+  toggleChatbotInput(false);
+  renderChatbotQuickReplies(chatbotContactButtons());
+}
+
+function chatbotRestoreQuickRepliesForStep(step) {
+  if (step === 'search') {
+    toggleChatbotInput(true, 'Nhập tên sản phẩm...');
+    renderChatbotQuickReplies(chatbotSearchButtons());
+    if (!chatbotCategoriesCache) {
+      chatbotGetCategories().then(function () {
+        if (chatbotStep === 'search') renderChatbotQuickReplies(chatbotSearchButtons());
+      });
+    }
+  } else if (step === 'postSearch') renderChatbotQuickReplies(chatbotPostSearchButtons());
+  else if (step === 'address') renderChatbotQuickReplies(chatbotAddressButtons());
+  else if (step === 'zalo') renderChatbotQuickReplies(chatbotZaloButtons());
+  else if (step === 'facebook') renderChatbotQuickReplies(chatbotFacebookButtons());
+  else if (step === 'contact') renderChatbotQuickReplies(chatbotContactButtons());
+  else renderChatbotQuickReplies(chatbotMainMenuButtons());
+}
+
+function chatbotStart() {
+  chatbotStep = 'menu';
+  toggleChatbotInput(false);
+  appendChatbotBot('Chào bạn! Mình là trợ lý của Khánh Hà 👋\nBạn cần mình giúp gì?');
+  renderChatbotQuickReplies(chatbotMainMenuButtons());
+}
+
+function chatbotIconSvg() {
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>';
+}
+
+function buildChatbotWidgetDom() {
+  var wrap = document.createElement('div');
+  wrap.className = 'chatbot-widget';
+  wrap.innerHTML =
+    '<button type="button" class="chatbot-toggle" id="chatbotToggle" aria-label="Mở trợ lý chat">' +
+      '<svg class="icon-chat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>' +
+      '<svg class="icon-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>' +
+    '</button>' +
+    '<div class="chatbot-panel" id="chatbotPanel">' +
+      '<div class="chatbot-header">' +
+        '<div class="chatbot-header-title">' + chatbotIconSvg() + '<span>Trợ lý Khánh Hà</span></div>' +
+        '<div class="chatbot-header-actions">' +
+          '<button type="button" id="chatbotReset" title="Bắt đầu lại"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 1 2.6 6.3"/><path d="M3 21v-6h6"/></svg></button>' +
+          '<button type="button" id="chatbotClose" title="Đóng"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="chatbot-messages" id="chatbotMessages"></div>' +
+      '<div class="chatbot-quickreplies" id="chatbotQuickReplies"></div>' +
+      '<form class="chatbot-input-row" id="chatbotInputRow" style="display:none;">' +
+        '<input type="text" id="chatbotSearchInput" placeholder="Nhập tên sản phẩm..." autocomplete="off">' +
+        '<button type="submit" aria-label="Gửi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7Z"/></svg></button>' +
+      '</form>' +
+    '</div>';
+  document.body.appendChild(wrap);
+}
+
+function initChatbot() {
+  if (document.querySelector('.chatbot-widget')) return;
+
+  buildChatbotWidgetDom();
+  chatbotSessionId = getOrCreateChatbotSessionId();
+
+  var toggleBtn = document.getElementById('chatbotToggle');
+  var panel = document.getElementById('chatbotPanel');
+  var closeBtn = document.getElementById('chatbotClose');
+  var resetBtn = document.getElementById('chatbotReset');
+  var form = document.getElementById('chatbotInputRow');
+  var input = document.getElementById('chatbotSearchInput');
+
+  function openPanel() {
+    panel.classList.add('open');
+    toggleBtn.classList.add('open');
+  }
+  function closePanel() {
+    panel.classList.remove('open');
+    toggleBtn.classList.remove('open');
+  }
+
+  toggleBtn.addEventListener('click', function () {
+    if (panel.classList.contains('open')) closePanel(); else openPanel();
+  });
+  closeBtn.addEventListener('click', closePanel);
+
+  resetBtn.addEventListener('click', function () {
+    try { localStorage.removeItem(CHATBOT_STORAGE_KEY); } catch (e) { /* ignore */ }
+    document.getElementById('chatbotMessages').innerHTML = '';
+    chatbotStart();
+  });
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var value = input.value;
+    input.value = '';
+    chatbotRunSearch(value);
+  });
+
+  var saved = loadChatbotHistory();
+  if (saved && saved.html) {
+    document.getElementById('chatbotMessages').innerHTML = saved.html;
+    chatbotStep = saved.step || 'menu';
+    chatbotRestoreQuickRepliesForStep(chatbotStep);
+  } else {
+    chatbotStart();
+  }
 }

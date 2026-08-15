@@ -29,6 +29,7 @@ var STORAGE_BUCKET = 'khanhha-web.firebasestorage.app';
 var categoriesCache = [];
 var productsCache = [];
 var messagesCache = [];
+var chatSessionsCache = [];
 var settingsCache = null;
 var appStarted = false;
 
@@ -270,6 +271,7 @@ function startApp() {
     listenCategories(),
     listenProducts(),
     listenMessages(),
+    listenChatSessions(),
     loadSettings()
   ]).then(function () {
     hideAppLoading();
@@ -332,6 +334,23 @@ function listenMessages() {
   });
 }
 
+function listenChatSessions() {
+  return new Promise(function (resolveFirstLoad) {
+    var firstLoad = true;
+    onSnapshot(query(collection(db, 'chatSessions'), orderBy('updatedAt', 'desc')), function (snap) {
+      chatSessionsCache = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+      renderChatSessions();
+      renderChatbotNoResultsSummary();
+      var navCount = document.getElementById('navCountChatSessions');
+      if (navCount) navCount.textContent = chatSessionsCache.length;
+      if (firstLoad) { firstLoad = false; resolveFirstLoad(); }
+    }, function (err) {
+      console.error('Lỗi tải phiên chatbot:', err);
+      if (firstLoad) { firstLoad = false; resolveFirstLoad(); }
+    });
+  });
+}
+
 /* =======================================================================
    ĐIỀU HƯỚNG TRANG (sidebar) — giữ nguyên logic gốc của mockup
    ======================================================================= */
@@ -341,6 +360,7 @@ var pageTitles = {
   'products': 'Sản phẩm',
   'categories': 'Danh mục',
   'messages': 'Hộp thư liên hệ',
+  'chatbot': 'Chatbot',
   'settings-appearance': 'Cài đặt — Giao diện',
   'settings-store': 'Cài đặt — Thông tin cửa hàng',
   'settings-links': 'Cài đặt — Liên kết'
@@ -1017,6 +1037,146 @@ document.getElementById('dfilter-pagesize').addEventListener('change', function 
   dashboardMsgPage = 1;
   renderRecentMessages();
 });
+
+/* =======================================================================
+   CHATBOT — danh sách phiên chat ghi lại từ widget trên web khách
+   (collection "chatSessions"), xem lại trong Admin để biết khách đang
+   hỏi gì, tìm sản phẩm gì mà chưa có kết quả.
+   ======================================================================= */
+
+var CHAT_EVENT_TARGET_LABELS = { zalo: 'Mở Zalo', facebook: 'Mở Facebook', maps: 'Xem bản đồ', contact_form: 'Mở form liên hệ' };
+
+function formatChatEvent(event) {
+  switch (event.type) {
+    case 'menu_click': return '👉 Chọn: ' + event.label;
+    case 'search':
+      return event.resultsCount > 0
+        ? '🔎 Tìm "' + event.query + '" — ' + event.resultsCount + ' kết quả'
+        : '🔎 Tìm "' + event.query + '" — không có kết quả';
+    case 'category_click': return '📂 Xem danh mục: ' + categoryName(event.category);
+    case 'product_click': return '📦 Xem sản phẩm: ' + event.productName;
+    case 'external_click': return '↗️ ' + (CHAT_EVENT_TARGET_LABELS[event.target] || event.target);
+    default: return event.type;
+  }
+}
+
+function formatChatEventTime(isoString) {
+  var d = isoString ? new Date(isoString) : null;
+  if (!d || isNaN(d.getTime())) return '';
+  return d.toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
+var chatSessionPage = 1;
+var chatSessionPageSize = 10;
+
+function renderChatSessionsPagination(totalItems) {
+  var container = document.getElementById('chatSessionsPagination');
+  if (!container) return;
+  var totalPages = Math.max(1, Math.ceil(totalItems / chatSessionPageSize));
+  if (chatSessionPage > totalPages) chatSessionPage = totalPages;
+  if (chatSessionPage < 1) chatSessionPage = 1;
+  container.innerHTML =
+    '<button class="page-btn" ' + (chatSessionPage <= 1 ? 'disabled' : '') + ' onclick="adminGoToChatSessionPage(' + (chatSessionPage - 1) + ')">‹ Trước</button>' +
+    '<span class="page-info">Trang ' + chatSessionPage + ' / ' + totalPages + '</span>' +
+    '<button class="page-btn" ' + (chatSessionPage >= totalPages ? 'disabled' : '') + ' onclick="adminGoToChatSessionPage(' + (chatSessionPage + 1) + ')">Sau ›</button>';
+}
+
+function goToChatSessionPage(page) {
+  chatSessionPage = page;
+  renderChatSessions();
+}
+
+function renderChatSessions() {
+  var list = document.getElementById('chatSessionsList');
+  if (!list) return;
+
+  renderChatSessionsPagination(chatSessionsCache.length);
+
+  if (!chatSessionsCache.length) {
+    list.innerHTML = '<p class="hint" style="padding:20px;">Chưa có phiên chat nào.</p>';
+    return;
+  }
+
+  var startIdx = (chatSessionPage - 1) * chatSessionPageSize;
+  var pageItems = chatSessionsCache.slice(startIdx, startIdx + chatSessionPageSize);
+
+  list.innerHTML = pageItems.map(function (s) {
+    var events = s.events || [];
+    var lastEvent = events.length ? events[events.length - 1] : null;
+    var summary = lastEvent ? formatChatEvent(lastEvent) : 'Chưa có hoạt động';
+    return '<div class="msg-item clickable-row" onclick="adminOpenChatSessionDetail(\'' + s.id + '\')">' +
+      '<div class="msg-avatar">💬</div>' +
+      '<div class="msg-body">' +
+      '<div class="msg-top"><span class="name">Khách #' + escapeHtml(s.id.slice(-6)) + ' · ' + events.length + ' hoạt động</span><span class="time">' + formatRelativeTime(s.updatedAt) + '</span></div>' +
+      '<div class="msg-content">' + escapeHtml(summary) + '</div>' +
+      '</div></div>';
+  }).join('');
+}
+
+document.getElementById('csfilter-pagesize').addEventListener('change', function () {
+  chatSessionPageSize = Number(this.value) || 10;
+  chatSessionPage = 1;
+  renderChatSessions();
+});
+
+/**
+ * Gộp toàn bộ sự kiện "search, 0 kết quả" trong mọi phiên chat lại, đếm
+ * theo từ khoá — giúp chủ shop thấy khách đang cần sản phẩm gì mà web
+ * chưa có/chưa đăng ảnh.
+ */
+function renderChatbotNoResultsSummary() {
+  var container = document.getElementById('chatbotNoResultsSummary');
+  if (!container) return;
+
+  var counts = {};
+  chatSessionsCache.forEach(function (s) {
+    (s.events || []).forEach(function (ev) {
+      if (ev.type !== 'search' || ev.resultsCount !== 0 || !ev.query) return;
+      var key = removeDiacritics(ev.query.trim());
+      if (!key) return;
+      if (!counts[key]) counts[key] = { label: ev.query.trim(), count: 0 };
+      counts[key].count++;
+    });
+  });
+
+  var list = Object.keys(counts).map(function (k) { return counts[k]; })
+    .sort(function (a, b) { return b.count - a.count; })
+    .slice(0, 15);
+
+  if (!list.length) {
+    container.innerHTML = '<p class="hint">Chưa có từ khoá nào tìm không ra kết quả.</p>';
+    return;
+  }
+
+  container.innerHTML = list.map(function (item) {
+    return '<span class="chatbot-nores-tag">' + escapeHtml(item.label) + '<span class="count">' + item.count + '</span></span>';
+  }).join('');
+}
+
+function openChatSessionDetail(id) {
+  var s = chatSessionsCache.find(function (x) { return x.id === id; });
+  if (!s) return;
+  var events = s.events || [];
+
+  var eventsHtml = events.length
+    ? events.map(function (ev) {
+        return '<div class="detail-row" style="align-items:flex-start;"><span style="flex:1;">' + escapeHtml(formatChatEvent(ev)) + '</span>' +
+          '<span style="font-size:11.5px;color:var(--muted);white-space:nowrap;">' + formatChatEventTime(ev.at) + '</span></div>';
+      }).join('')
+    : '<p class="hint">Chưa có hoạt động nào.</p>';
+
+  var panel = document.getElementById('drawerPanel');
+  panel.innerHTML =
+    '<div class="drawer-head"><h3 style="font-size:16px;">Phiên chat #' + escapeHtml(s.id.slice(-6)) + '</h3><button class="modal-close" onclick="adminCloseDrawer()">' + closeXIcon() + '</button></div>' +
+    '<div class="drawer-body">' +
+    '<div class="detail-row"><span>Bắt đầu</span><span>' + formatRelativeTime(s.startedAt) + '</span></div>' +
+    '<div class="detail-row"><span>Hoạt động gần nhất</span><span>' + formatRelativeTime(s.updatedAt) + '</span></div>' +
+    '<div style="margin-top:16px;"><label style="font-size:12.5px;font-weight:600;">Diễn biến (' + events.length + ')</label>' +
+    '<div style="margin-top:6px;">' + eventsHtml + '</div></div>' +
+    '</div>';
+
+  document.getElementById('drawerOverlay').classList.add('open');
+}
 
 /**
  * Bấm 1 tin nhắn ở khối "Tin nhắn gần đây" trên Tổng quan -> chuyển sang
@@ -1710,6 +1870,8 @@ window.adminOpenDeleteConfirm = openDeleteConfirm;
 window.adminConfirmDelete = confirmDelete;
 window.adminCloseModal = closeModal;
 window.adminOpenMessageDetail = openMessageDetail;
+window.adminGoToChatSessionPage = goToChatSessionPage;
+window.adminOpenChatSessionDetail = openChatSessionDetail;
 window.adminCloseDrawer = closeDrawer;
 window.adminSetMessageStatus = setMessageStatus;
 window.adminSaveMessageNote = saveMessageNote;
