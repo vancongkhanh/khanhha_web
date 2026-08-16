@@ -38,5 +38,11 @@ service cloud.firestore {
       allow create, update: if true;
       allow read, delete: if isAdmin();
     }
+
+    // Token FCM theo từng thiết bị của admin (2 tài khoản dùng chung, mỗi
+    // người 1 iPhone) — chỉ admin đã đăng nhập mới đọc/ghi được.
+    match /adminDevices/{deviceId} {
+      allow read, write: if isAdmin();
+    }
   }
 }

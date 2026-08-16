@@ -15,11 +15,15 @@ import {
 import {
   ref, uploadBytes, getDownloadURL
 } from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-storage.js';
+import {
+  getMessaging, getToken, onMessage, isSupported as isMessagingSupported
+} from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-messaging.js';
 
 // UID các tài khoản được phép vào trang quản trị — thêm UID thứ 2 vào đây
 // khi tạo xong tài khoản cho người còn lại (nhớ cập nhật cả firestore.rules
 // và storage.rules cho khớp).
 var ADMIN_UIDS = ['BxRGkox6sYZhwSM7OOjqu42J9bH2'];
+var currentAdminUid = null;
 
 var STORAGE_BUCKET = 'khanhha-web.firebasestorage.app';
 
@@ -190,12 +194,14 @@ function setAppVisible(visible) {
 onAuthStateChanged(auth, function (user) {
   var loginError = document.getElementById('loginError');
   if (user && ADMIN_UIDS.indexOf(user.uid) !== -1) {
+    currentAdminUid = user.uid;
     loginError.textContent = '';
     setAppVisible(true);
     document.getElementById('topbarUserEmail').textContent = user.email || '';
     showAppLoading();
     startApp();
   } else {
+    currentAdminUid = null;
     if (user) {
       loginError.textContent = 'Tài khoản này không có quyền quản trị.';
       signOut(auth);
@@ -267,6 +273,8 @@ function startApp() {
     return;
   }
   appStarted = true;
+  listenAdminDevices();
+  initPushNotifications();
   Promise.all([
     listenCategories(),
     listenProducts(),
@@ -325,6 +333,8 @@ function listenMessages() {
       renderMessages();
       renderRecentMessages();
       updateDashboardStats();
+      updateNotifyBadge();
+      renderNotifyDropdown();
       if (firstLoad) { firstLoad = false; resolveFirstLoad(); }
     }, function (err) {
       console.error('Lỗi tải tin nhắn:', err);
@@ -953,10 +963,12 @@ function renderMessages() {
     var telHref = 'tel:' + phoneDigits;
     var zaloHref = 'https://zalo.me/' + phoneDigits;
     var imageTag = m.imageUrl ? ' <span title="Có ảnh đính kèm">📷</span>' : '';
-    return '<div class="msg-item clickable-row" onclick="adminOpenMessageDetail(\'' + m.id + '\')">' +
+    var isUnread = !m.read;
+    var unreadDot = isUnread ? '<span class="unread-dot" title="Chưa đọc"></span>' : '';
+    return '<div class="msg-item clickable-row' + (isUnread ? ' msg-unread' : ' msg-read') + '" onclick="adminOpenMessageDetail(\'' + m.id + '\')">' +
       '<div class="msg-avatar">' + escapeHtml((m.name || '?').charAt(0)) + '</div>' +
       '<div class="msg-body">' +
-      '<div class="msg-top"><span class="name">' + escapeHtml(m.name) + ' — ' + escapeHtml(m.phone) + '</span><span class="time">' + formatRelativeTime(m.createdAt) + '</span></div>' +
+      '<div class="msg-top"><span class="name">' + unreadDot + escapeHtml(m.name) + ' — ' + escapeHtml(m.phone) + '</span><span class="time">' + formatRelativeTime(m.createdAt) + '</span></div>' +
       '<div class="msg-content">' + escapeHtml(m.content) + imageTag + '</div>' +
       '<div class="msg-actions">' +
       '<span class="badge ' + badgeClass + '">' + badgeLabel + '</span>' +
@@ -1191,6 +1203,13 @@ function goToMessageDetail(id) {
 function openMessageDetail(id) {
   var m = messagesCache.find(function (x) { return x.id === id; });
   if (!m) return;
+
+  if (!m.read) {
+    updateDoc(doc(db, 'messages', id), { read: true, readBy: currentAdminUid }).catch(function (err) {
+      console.error('Không đánh dấu đã đọc được:', err);
+    });
+  }
+
   var phoneDigits = (m.phone || '').replace(/[^0-9+]/g, '');
   var telHref = 'tel:' + phoneDigits;
   var zaloHref = 'https://zalo.me/' + phoneDigits;
@@ -1842,6 +1861,253 @@ function showToast(text) {
 }
 
 /* =======================================================================
+   THÔNG BÁO ĐẨY (FCM) — báo tin nhắn mới ngay cả khi admin đã đóng tab,
+   yêu cầu đã cài trang admin như PWA trên iPhone (xem admin/manifest.json
+   + admin/firebase-messaging-sw.js). Cloud Function gửi thông báo nằm ở
+   functions/index.js — không nằm trong file này.
+   ======================================================================= */
+
+// ĐIỀN VAPID KEY THẬT VÀO ĐÂY trước khi tính năng này hoạt động được:
+// Firebase Console → Project Settings → Cloud Messaging → Web
+// configuration → Generate key pair → dán chuỗi key vào đây.
+// Để trống thì phần còn lại của trang vẫn chạy bình thường, chỉ riêng
+// thông báo đẩy sẽ báo lỗi rõ trong console thay vì âm thầm không chạy.
+var FCM_VAPID_KEY = '';
+
+var NOTIFY_DEVICE_ID_KEY = 'khanhha_admin_device_id';
+var NOTIFY_DISMISSED_KEY = 'khanhha_admin_notify_dismissed';
+
+var fcmMessaging = null;
+var adminDevicesCache = [];
+
+function initPushNotifications() {
+  if (!('Notification' in window) || !('serviceWorker' in navigator)) return;
+
+  isMessagingSupported().then(function (supported) {
+    if (!supported) {
+      console.warn('Trình duyệt này không hỗ trợ Firebase Messaging (bình thường với 1 số trình duyệt/chế độ riêng tư).');
+      return;
+    }
+    fcmMessaging = getMessaging();
+
+    onMessage(fcmMessaging, function (payload) {
+      var data = payload.data || {};
+      showToast((data.title || 'Có tin nhắn mới') + (data.body ? ' — ' + data.body : ''));
+      playNotifySound();
+      updateNotifyBadge();
+    });
+
+    if (Notification.permission === 'granted') {
+      registerPushDevice();
+    } else if (Notification.permission === 'default') {
+      var dismissed = false;
+      try { dismissed = localStorage.getItem(NOTIFY_DISMISSED_KEY) === '1'; } catch (e) { /* ignore */ }
+      if (!dismissed) document.getElementById('notifyPromptOverlay').classList.add('open');
+    }
+  }).catch(function (err) {
+    console.warn('Không kiểm tra được hỗ trợ Firebase Messaging:', err);
+  });
+}
+
+function dismissNotifyPrompt() {
+  document.getElementById('notifyPromptOverlay').classList.remove('open');
+  try { localStorage.setItem(NOTIFY_DISMISSED_KEY, '1'); } catch (e) { /* ignore */ }
+}
+
+function enableNotifications() {
+  var btn = document.getElementById('notifyEnableBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Đang bật...'; }
+
+  Notification.requestPermission().then(function (permission) {
+    document.getElementById('notifyPromptOverlay').classList.remove('open');
+    if (permission === 'granted') {
+      try { localStorage.removeItem(NOTIFY_DISMISSED_KEY); } catch (e) { /* ignore */ }
+      registerPushDevice();
+      showToast('Đã bật thông báo cho thiết bị này');
+    } else {
+      try { localStorage.setItem(NOTIFY_DISMISSED_KEY, '1'); } catch (e) { /* ignore */ }
+      showToast('Bạn đã từ chối quyền thông báo');
+    }
+  }).catch(function (err) {
+    console.error('Xin quyền thông báo thất bại:', err);
+    showToast('Không bật được thông báo, thử lại sau');
+  }).finally(function () {
+    if (btn) { btn.disabled = false; btn.textContent = 'Bật thông báo'; }
+  });
+}
+
+function registerPushDevice() {
+  if (!fcmMessaging) return;
+  if (!FCM_VAPID_KEY) {
+    console.warn('Chưa cấu hình FCM_VAPID_KEY trong admin.js — xem hướng dẫn ở đầu phần "THÔNG BÁO ĐẨY".');
+    return;
+  }
+
+  navigator.serviceWorker.register('firebase-messaging-sw.js').then(function (registration) {
+    return getToken(fcmMessaging, { vapidKey: FCM_VAPID_KEY, serviceWorkerRegistration: registration });
+  }).then(function (token) {
+    if (token) saveDeviceToken(token);
+  }).catch(function (err) {
+    console.error('Không lấy được FCM token:', err);
+  });
+}
+
+function detectPlatform() {
+  var ua = navigator.userAgent || '';
+  if (/iphone|ipad|ipod/i.test(ua)) return 'ios';
+  if (/android/i.test(ua)) return 'android';
+  return 'web';
+}
+
+function defaultDeviceLabel(platform) {
+  if (platform === 'ios') return /ipad/i.test(navigator.userAgent) ? 'iPad' : 'iPhone';
+  if (platform === 'android') return 'Điện thoại Android';
+  return 'Trình duyệt web';
+}
+
+function saveDeviceToken(token) {
+  var platform = detectPlatform();
+  var basePayload = { adminId: currentAdminUid, token: token, platform: platform, lastActiveAt: serverTimestamp() };
+
+  var deviceDocId = null;
+  try { deviceDocId = localStorage.getItem(NOTIFY_DEVICE_ID_KEY); } catch (e) { /* ignore */ }
+
+  if (deviceDocId) {
+    updateDoc(doc(db, 'adminDevices', deviceDocId), basePayload).catch(function () {
+      // Document cũ có thể đã bị Cloud Function tự dọn (token hỏng) -> tạo lại mới.
+      try { localStorage.removeItem(NOTIFY_DEVICE_ID_KEY); } catch (e2) { /* ignore */ }
+      createDeviceDoc(basePayload, platform);
+    });
+  } else {
+    createDeviceDoc(basePayload, platform);
+  }
+}
+
+function createDeviceDoc(basePayload, platform) {
+  var fullPayload = Object.assign({}, basePayload, {
+    deviceLabel: defaultDeviceLabel(platform),
+    createdAt: serverTimestamp()
+  });
+  addDoc(collection(db, 'adminDevices'), fullPayload).then(function (docRef) {
+    try { localStorage.setItem(NOTIFY_DEVICE_ID_KEY, docRef.id); } catch (e) { /* ignore */ }
+  }).catch(function (err) {
+    console.error('Không lưu được thiết bị nhận thông báo:', err);
+  });
+}
+
+function listenAdminDevices() {
+  onSnapshot(collection(db, 'adminDevices'), function (snap) {
+    adminDevicesCache = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+    renderNotifyDropdown();
+  }, function (err) {
+    console.error('Không tải được danh sách thiết bị:', err);
+  });
+}
+
+var notifySoundCtx = null;
+function playNotifySound() {
+  try {
+    if (!notifySoundCtx) notifySoundCtx = new (window.AudioContext || window.webkitAudioContext)();
+    var osc = notifySoundCtx.createOscillator();
+    var gain = notifySoundCtx.createGain();
+    osc.connect(gain);
+    gain.connect(notifySoundCtx.destination);
+    osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.001, notifySoundCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.15, notifySoundCtx.currentTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, notifySoundCtx.currentTime + 0.35);
+    osc.start();
+    osc.stop(notifySoundCtx.currentTime + 0.35);
+  } catch (e) { /* Trình duyệt chặn âm thanh nếu chưa có tương tác — bỏ qua */ }
+}
+
+/**
+ * Cập nhật badge đỏ trên icon chuông + tiêu đề tab trình duyệt theo số
+ * tin nhắn có read == false — gọi lại mỗi khi messagesCache thay đổi.
+ */
+function updateNotifyBadge() {
+  var unread = messagesCache.filter(function (m) { return !m.read; }).length;
+  var badge = document.getElementById('notifyBadge');
+  if (badge) {
+    badge.textContent = unread > 99 ? '99+' : unread;
+    badge.style.display = unread > 0 ? 'flex' : 'none';
+  }
+  document.title = unread > 0 ? '(' + unread + ') Khánh Hà Admin' : 'Khánh Hà Admin';
+}
+
+function toggleNotifyDropdown() {
+  document.getElementById('notifyDropdown').classList.toggle('open');
+}
+
+function renderNotifyDropdown() {
+  var body = document.getElementById('notifyDropdownBody');
+  if (!body) return;
+
+  var unreadCount = messagesCache.filter(function (m) { return !m.read; }).length;
+  var currentDeviceId = null;
+  try { currentDeviceId = localStorage.getItem(NOTIFY_DEVICE_ID_KEY); } catch (e) { /* ignore */ }
+  var thisDeviceRegistered = currentDeviceId && adminDevicesCache.some(function (d) { return d.id === currentDeviceId; });
+
+  var html = '<div class="notify-row"><span>Tin nhắn chưa đọc</span><strong>' + unreadCount + '</strong></div>';
+
+  if (adminDevicesCache.length) {
+    html += '<div style="margin-top:8px;">' + adminDevicesCache.map(function (d) {
+      var platformLabel = d.platform === 'ios' ? 'iOS' : (d.platform === 'android' ? 'Android' : 'Web');
+      return '<div class="notify-device-item">' +
+        '<input type="text" value="' + escapeHtml(d.deviceLabel || '') + '" onchange="adminRenameDevice(\'' + d.id + '\', this.value)">' +
+        '<span class="platform">' + platformLabel + '</span>' +
+        '<button class="icon-btn" title="Gỡ thiết bị" onclick="adminRemoveDevice(\'' + d.id + '\')">' + trashIcon() + '</button>' +
+        '</div>';
+    }).join('') + '</div>';
+  } else {
+    html += '<p class="hint" style="margin-top:8px;">Chưa có thiết bị nào bật thông báo.</p>';
+  }
+
+  if (!thisDeviceRegistered) {
+    html += '<button type="button" class="btn btn-primary notify-enable-btn" onclick="adminEnableNotifications()">🔔 Bật thông báo trên thiết bị này</button>';
+  }
+
+  body.innerHTML = html;
+}
+
+function renameDevice(id, label) {
+  var trimmed = (label || '').trim();
+  if (!trimmed) return;
+  updateDoc(doc(db, 'adminDevices', id), { deviceLabel: trimmed }).then(function () {
+    showToast('Đã đổi tên thiết bị');
+  }).catch(function (err) {
+    console.error(err);
+    showToast('Đổi tên thất bại');
+  });
+}
+
+function removeDevice(id) {
+  deleteDoc(doc(db, 'adminDevices', id)).then(function () {
+    try {
+      if (localStorage.getItem(NOTIFY_DEVICE_ID_KEY) === id) localStorage.removeItem(NOTIFY_DEVICE_ID_KEY);
+    } catch (e) { /* ignore */ }
+    showToast('Đã gỡ thiết bị — sẽ không nhận thông báo nữa');
+  }).catch(function (err) {
+    console.error(err);
+    showToast('Gỡ thiết bị thất bại');
+  });
+}
+
+var notifyBellBtnEl = document.getElementById('notifyBellBtn');
+if (notifyBellBtnEl) {
+  notifyBellBtnEl.addEventListener('click', function (e) {
+    e.stopPropagation();
+    toggleNotifyDropdown();
+  });
+  document.addEventListener('click', function (e) {
+    var dropdown = document.getElementById('notifyDropdown');
+    if (dropdown && dropdown.classList.contains('open') && !dropdown.contains(e.target) && e.target !== notifyBellBtnEl) {
+      dropdown.classList.remove('open');
+    }
+  });
+}
+
+/* =======================================================================
    GẮN HÀM VÀO window — để các onclick="..." sinh ra trong HTML gọi được
    (module scope không tự động lộ ra global như script thường)
    ======================================================================= */
@@ -1875,6 +2141,10 @@ window.adminCloseModal = closeModal;
 window.adminOpenMessageDetail = openMessageDetail;
 window.adminGoToChatSessionPage = goToChatSessionPage;
 window.adminOpenChatSessionDetail = openChatSessionDetail;
+window.adminDismissNotifyPrompt = dismissNotifyPrompt;
+window.adminEnableNotifications = enableNotifications;
+window.adminRenameDevice = renameDevice;
+window.adminRemoveDevice = removeDevice;
 window.adminCloseDrawer = closeDrawer;
 window.adminSetMessageStatus = setMessageStatus;
 window.adminSaveMessageNote = saveMessageNote;

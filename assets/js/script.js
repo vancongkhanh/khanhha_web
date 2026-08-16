@@ -1240,6 +1240,8 @@ function initContactForm() {
         content: content,
         status: 'moi',
         note: '',
+        read: false,
+        readBy: null,
         createdAt: serverTimestamp()
       };
       if (imageUrl) payload.imageUrl = imageUrl;
