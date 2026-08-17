@@ -39,7 +39,7 @@ var SITE_CONFIG = {
     priceDisplayMode: 'show'
   },
   store: {
-    address: 'Km 3, xã Hàm Liêm, tỉnh Lâm Đồng',
+    address: 'Km 3, xã Hàm Liêm, TP. Phan Thiết (tỉnh Lâm Đồng)',
     addressNote: '(gần ngã ba Hàm Liêm, gần KCN Phan Thiết)',
     hoursWeekday: 'Thứ 2 – Thứ 7: 7:30 – 18:00',
     hoursSunday: 'Chủ nhật: 7:30 – 12:00',
