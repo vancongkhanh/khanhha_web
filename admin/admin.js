@@ -6,7 +6,7 @@
 import { db, auth, getStorageLazy } from '../assets/js/firebase-init.js';
 import {
   collection, doc, onSnapshot, addDoc, setDoc, updateDoc, deleteDoc,
-  getDoc, query, orderBy, serverTimestamp
+  getDoc, query, where, orderBy, serverTimestamp, getCountFromServer
 } from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js';
 import {
   signInWithEmailAndPassword, onAuthStateChanged, signOut,
@@ -268,8 +268,13 @@ document.getElementById('logoutBtn').addEventListener('click', function () {
 
 /*
  * TẢI TRANG NHANH HƠN — tách "cần ngay" và "tải sau":
- * - Cần ngay để vẽ được Tổng quan/Sản phẩm/Danh mục/Hộp thư: 4 promise
- *   trong Promise.all bên dưới. Màn hình "Đang tải" chỉ chờ đúng 4 cái này.
+ * - Cần ngay để vẽ Tổng quan (chỉ cần CON SỐ, không cần cả danh sách) và
+ *   Hộp thư: loadDashboardCounts() (đếm bằng getCountFromServer — không
+ *   tải toàn bộ document), listenMessages(), loadSettings(). Màn hình
+ *   "Đang tải" chỉ chờ đúng 3 cái này.
+ * - Danh sách đầy đủ Sản phẩm + Danh mục (bảng, ảnh, bộ lọc...) CHƯA tải
+ *   ở bước này — chỉ tải khi admin thật sự bấm vào trang Sản phẩm hoặc
+ *   Danh mục lần đầu, xem ensureCatalogLoaded() và showPage().
  * - Chưa cần ngay (chạy song song, không chặn màn hình chờ): phiên chatbot
  *   (chỉ hiển thị ở trang Chatbot + 1 con số trên Tổng quan), danh sách
  *   thiết bị nhận thông báo, và toàn bộ phần đăng ký thông báo đẩy — SDK
@@ -284,8 +289,7 @@ function startApp() {
   appStarted = true;
 
   Promise.all([
-    listenCategories(),
-    listenProducts(),
+    loadDashboardCounts(),
     listenMessages(),
     loadSettings()
   ]).then(function () {
@@ -296,6 +300,58 @@ function startApp() {
   listenChatSessions();
   listenAdminDevices();
   initPushNotifications();
+}
+
+/**
+ * Con số cho 3 thẻ thống kê đầu (Sản phẩm/Hết hàng/Danh mục) trên Tổng
+ * quan — dùng getCountFromServer() để CHỈ đếm, không tải cả danh sách sản
+ * phẩm/danh mục về máy. Một khi admin đã vào trang Sản phẩm/Danh mục thật
+ * (catalogLoaded = true), updateDashboardStats() sẽ tự chuyển sang dùng
+ * số đếm "sống" từ cache thật thay vì con số đếm 1 lần này.
+ */
+var dashboardProductCount = null;
+var dashboardOutOfStockCount = null;
+var dashboardCategoryCount = null;
+
+function loadDashboardCounts() {
+  return Promise.all([
+    getCountFromServer(collection(db, 'products')),
+    getCountFromServer(query(collection(db, 'products'), where('stock', '==', false))),
+    getCountFromServer(collection(db, 'categories'))
+  ]).then(function (snaps) {
+    dashboardProductCount = snaps[0].data().count;
+    dashboardOutOfStockCount = snaps[1].data().count;
+    dashboardCategoryCount = snaps[2].data().count;
+    updateDashboardStats();
+  }).catch(function (err) {
+    console.error('Không tải được số liệu thống kê:', err);
+  });
+}
+
+/**
+ * Danh sách đầy đủ Sản phẩm + Danh mục — tải "lười", chỉ gọi khi admin
+ * bấm vào 1 trong 2 trang này lần đầu (xem showPage()). 2 collection này
+ * tải chung 1 lượt vì phụ thuộc lẫn nhau khi hiển thị: bảng Sản phẩm cần
+ * tên danh mục, thẻ Danh mục cần đếm số sản phẩm theo từng danh mục.
+ */
+var catalogLoaded = false;
+var catalogLoadPromise = null;
+
+function ensureCatalogLoaded() {
+  if (!catalogLoadPromise) {
+    renderProducts();
+    renderCategories();
+    catalogLoadPromise = Promise.all([listenCategories(), listenProducts()]).then(function () {
+      catalogLoaded = true;
+      // onSnapshot bên trong listenCategories()/listenProducts() có thể đã
+      // tự vẽ lại TRƯỚC KHI catalogLoaded chuyển thành true (nên vẫn còn
+      // thấy "Đang tải..." dù dữ liệu đã về) -> vẽ lại thêm 1 lần ở đây.
+      renderProducts();
+      renderCategories();
+      updateDashboardStats();
+    });
+  }
+  return catalogLoadPromise;
 }
 
 /**
@@ -404,6 +460,8 @@ var pageTitles = {
 };
 
 function showPage(key) {
+  if (key === 'products' || key === 'categories') ensureCatalogLoaded();
+
   document.querySelectorAll('.page').forEach(function (p) { p.classList.remove('active'); });
   var target = document.getElementById('page-' + (key.indexOf('settings-') === 0 ? 'settings-appearance' : key));
   if (target) target.classList.add('active');
@@ -522,6 +580,15 @@ function goToProductPage(page) {
 function renderProducts() {
   var tbody = document.getElementById('productsTableBody');
   if (!tbody) return;
+
+  if (!catalogLoaded) {
+    tbody.innerHTML = '<tr><td colspan="6"><p class="hint" style="padding:20px 0;text-align:center;">Đang tải dữ liệu...</p></td></tr>';
+    var loadingSubtitle = document.getElementById('productsSubtitle');
+    if (loadingSubtitle) loadingSubtitle.textContent = 'Đang tải...';
+    var pagination = document.getElementById('productsPagination');
+    if (pagination) pagination.innerHTML = '';
+    return;
+  }
 
   var outOfStockTotal = productsCache.filter(function (p) { return !p.stock; }).length;
   var filtered = applyProductFilters(productsCache);
@@ -817,6 +884,12 @@ function saveProduct(id, btn) {
 function renderCategories() {
   var grid = document.getElementById('categoriesGrid');
   if (!grid) return;
+
+  if (!catalogLoaded) {
+    grid.innerHTML = '<p class="hint" style="padding:20px 0;">Đang tải dữ liệu...</p>';
+    return;
+  }
+
   var html = categoriesCache.map(function (c) {
     var count = productsCache.filter(function (p) { return p.category === c.slug; }).length;
     return '<div class="card cat-admin-card">' +
@@ -1292,6 +1365,24 @@ var pinfoIndex = 0;
 
 function openProductInfoModal(id) {
   var product = productsCache.find(function (p) { return p.id === id; });
+  if (product) { renderProductInfoModal(product); return; }
+
+  // Chưa từng vào trang Sản phẩm nên chưa có trong cache -> tải riêng đúng
+  // 1 document này (không cần tải cả danh sách sản phẩm chỉ để xem 1 cái).
+  document.getElementById('productInfoPanel').innerHTML =
+    '<div class="modal-head"><h3>Thông tin sản phẩm</h3><button class="modal-close" onclick="adminCloseProductInfo()">' + closeXIcon() + '</button></div>' +
+    '<div class="modal-body"><p class="hint">Đang tải...</p></div>';
+  document.getElementById('productInfoOverlay').classList.add('open');
+
+  getDoc(doc(db, 'products', id)).then(function (snap) {
+    renderProductInfoModal(snap.exists() ? Object.assign({ id: snap.id }, snap.data()) : null);
+  }).catch(function (err) {
+    console.error('Không tải được sản phẩm:', err);
+    renderProductInfoModal(null);
+  });
+}
+
+function renderProductInfoModal(product) {
   var panel = document.getElementById('productInfoPanel');
 
   if (!product) {
@@ -1430,21 +1521,28 @@ function saveMessageNote(id, btn) {
    ======================================================================= */
 
 function updateDashboardStats() {
+  // Ưu tiên số đếm "sống" từ cache thật một khi đã vào trang Sản phẩm/Danh
+  // mục ít nhất 1 lần (catalogLoaded); trước đó dùng con số đếm nhanh từ
+  // loadDashboardCounts() (getCountFromServer — không tải cả danh sách).
+  var productCount = catalogLoaded ? productsCache.length : dashboardProductCount;
+  var outOfStockCount = catalogLoaded ? productsCache.filter(function (p) { return !p.stock; }).length : dashboardOutOfStockCount;
+  var categoryCount = catalogLoaded ? categoriesCache.length : dashboardCategoryCount;
+  var newMessagesCount = messagesCache.filter(function (m) { return m.status === 'moi'; }).length;
+
   var els = document.querySelectorAll('#page-dashboard .stat-card .value');
   if (els.length >= 4) {
-    els[0].textContent = productsCache.length;
-    els[1].textContent = productsCache.filter(function (p) { return !p.stock; }).length;
-    els[2].textContent = categoriesCache.length;
-    els[3].textContent = messagesCache.filter(function (m) { return m.status === 'moi'; }).length;
+    els[0].textContent = productCount == null ? '…' : productCount;
+    els[1].textContent = outOfStockCount == null ? '…' : outOfStockCount;
+    els[2].textContent = categoryCount == null ? '…' : categoryCount;
+    els[3].textContent = newMessagesCount;
   }
   var statChatSessions = document.getElementById('statChatSessions');
   if (statChatSessions) statChatSessions.textContent = chatSessionsCache.length;
-  var newMessagesCount = messagesCache.filter(function (m) { return m.status === 'moi'; }).length;
   var navProducts = document.getElementById('navCountProducts');
   var navCategories = document.getElementById('navCountCategories');
   var navMessages = document.getElementById('navCountMessages');
-  if (navProducts) navProducts.textContent = productsCache.length;
-  if (navCategories) navCategories.textContent = categoriesCache.length;
+  if (navProducts) navProducts.textContent = productCount == null ? '…' : productCount;
+  if (navCategories) navCategories.textContent = categoryCount == null ? '…' : categoryCount;
   if (navMessages) navMessages.textContent = newMessagesCount;
 }
 
