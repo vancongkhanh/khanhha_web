@@ -1996,6 +1996,11 @@ function createDeviceDoc(basePayload, platform) {
   });
   addDoc(collection(db, 'adminDevices'), fullPayload).then(function (docRef) {
     try { localStorage.setItem(NOTIFY_DEVICE_ID_KEY, docRef.id); } catch (e) { /* ignore */ }
+    // onSnapshot của listenAdminDevices() có thể đã vẽ lại khung chuông
+    // NGAY khi document mới xuất hiện — tức là trước khi dòng lưu
+    // localStorage phía trên kịp chạy xong — nên vẽ lại thêm 1 lần nữa ở
+    // đây để nút "Bật thông báo" biến mất đúng lúc.
+    renderNotifyDropdown();
   }).catch(function (err) {
     console.error('Không lưu được thiết bị nhận thông báo:', err);
   });
@@ -2042,7 +2047,9 @@ function updateNotifyBadge() {
 }
 
 function toggleNotifyDropdown() {
-  document.getElementById('notifyDropdown').classList.toggle('open');
+  var dropdown = document.getElementById('notifyDropdown');
+  dropdown.classList.toggle('open');
+  if (dropdown.classList.contains('open')) renderNotifyDropdown();
 }
 
 function renderNotifyDropdown() {

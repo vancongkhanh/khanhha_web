@@ -23,7 +23,8 @@
     --ok:#2E7D4F; --ok-bg:#E5F3EA; --warn:#B4552B; --warn-bg:#FBE9DF;
   }
   *{box-sizing:border-box;margin:0;padding:0;}
-  body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--ink);display:flex;min-height:100vh;}
+  html{overflow-x:hidden;}
+  body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--ink);display:flex;min-height:100vh;overflow-x:hidden;}
   h1,h2,h3{font-family:'Fraunces',serif;font-weight:600;color:var(--pine);}
   button{font-family:inherit;cursor:pointer;}
   input,select,textarea{font-family:inherit;}
@@ -229,6 +230,10 @@
     .topbar{padding:14px 16px;}
     .topbar h2{font-size:17px;}
     .who-email{display:none;}
+    /* Khung chuông neo theo icon chuông có thể tràn ra ngoài mép trái màn
+       hình (icon không nằm sát mép phải) -> kéo giãn cả trang theo chiều
+       ngang. Trên di động, neo thẳng theo mép màn hình cho chắc chắn. */
+    .notify-dropdown{position:fixed;top:64px;left:12px;right:12px;width:auto;max-width:none;}
     .stat-grid{grid-template-columns:1fr 1fr;}
     .form-grid{grid-template-columns:1fr;}
     .cat-admin-grid{grid-template-columns:1fr 1fr;}
@@ -556,7 +561,7 @@
         </button>
         <div class="notify-dropdown" id="notifyDropdown">
           <div class="notify-dropdown-head">Thông báo</div>
-          <div id="notifyDropdownBody"></div>
+          <div id="notifyDropdownBody" class="notify-dropdown-body"></div>
         </div>
       </div>
       <span id="topbarUserEmail" class="who-email">—</span>
