@@ -1872,7 +1872,7 @@ function showToast(text) {
 // configuration → Generate key pair → dán chuỗi key vào đây.
 // Để trống thì phần còn lại của trang vẫn chạy bình thường, chỉ riêng
 // thông báo đẩy sẽ báo lỗi rõ trong console thay vì âm thầm không chạy.
-var FCM_VAPID_KEY = '';
+var FCM_VAPID_KEY = 'BI805UpmMbfwR2q6Js7QPqdgja-AYKUWgUqOc75fVyN8CLLSwS2kUFc9CxU73lmtSD_JeASZdmyZ1ZOclLRWvmY';
 
 var NOTIFY_DEVICE_ID_KEY = 'khanhha_admin_device_id';
 var NOTIFY_DISMISSED_KEY = 'khanhha_admin_notify_dismissed';
