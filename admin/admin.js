@@ -1914,8 +1914,14 @@ function dismissNotifyPrompt() {
   try { localStorage.setItem(NOTIFY_DISMISSED_KEY, '1'); } catch (e) { /* ignore */ }
 }
 
-function enableNotifications() {
-  var btn = document.getElementById('notifyEnableBtn');
+function enableNotifications(btnEl) {
+  var btn = btnEl || document.getElementById('notifyEnableBtn');
+  var originalText = btn ? btn.textContent : '';
+
+  if (!('Notification' in window)) {
+    showToast('Trình duyệt không hỗ trợ — trên iPhone cần mở app đã "Thêm vào MH chính", không mở qua Safari thường.');
+    return;
+  }
   if (btn) { btn.disabled = true; btn.textContent = 'Đang bật...'; }
 
   Notification.requestPermission().then(function (permission) {
@@ -1932,7 +1938,7 @@ function enableNotifications() {
     console.error('Xin quyền thông báo thất bại:', err);
     showToast('Không bật được thông báo, thử lại sau');
   }).finally(function () {
-    if (btn) { btn.disabled = false; btn.textContent = 'Bật thông báo'; }
+    if (btn) { btn.disabled = false; btn.textContent = originalText; }
   });
 }
 
@@ -2064,7 +2070,7 @@ function renderNotifyDropdown() {
   }
 
   if (!thisDeviceRegistered) {
-    html += '<button type="button" class="btn btn-primary notify-enable-btn" onclick="adminEnableNotifications()">🔔 Bật thông báo trên thiết bị này</button>';
+    html += '<button type="button" class="btn btn-primary notify-enable-btn" onclick="adminEnableNotifications(this)">🔔 Bật thông báo trên thiết bị này</button>';
   }
 
   body.innerHTML = html;
