@@ -6,7 +6,6 @@
 
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js';
 import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js';
-import { getStorage } from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-storage.js';
 import { getAuth } from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js';
 
 const firebaseConfig = {
@@ -21,5 +20,24 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 
 export const db = getFirestore(app);
-export const storage = getStorage(app);
 export const auth = getAuth(app);
+
+// Storage chỉ thật sự cần khi có upload ảnh (thêm/sửa sản phẩm, đổi logo,
+// khách đính kèm ảnh...) — không cần cho việc hiển thị dữ liệu ban đầu (xem
+// ảnh dùng storagePathToUrl() tự dựng URL, không cần SDK). Tải "lười" bằng
+// import() để bớt ~14KB JS chặn đường tải chính lúc mới vào trang.
+let storageModulePromise = null;
+export function getStorageLazy() {
+  if (!storageModulePromise) {
+    storageModulePromise = import('https://www.gstatic.com/firebasejs/10.13.2/firebase-storage.js')
+      .then(function (mod) {
+        return {
+          storage: mod.getStorage(app),
+          ref: mod.ref,
+          uploadBytes: mod.uploadBytes,
+          getDownloadURL: mod.getDownloadURL
+        };
+      });
+  }
+  return storageModulePromise;
+}

@@ -3,7 +3,7 @@
    Nối trang quản trị (mockup) với Firebase thật: Auth, Firestore, Storage.
    ===================================================================== */
 
-import { db, auth, storage } from '../assets/js/firebase-init.js';
+import { db, auth, getStorageLazy } from '../assets/js/firebase-init.js';
 import {
   collection, doc, onSnapshot, addDoc, setDoc, updateDoc, deleteDoc,
   getDoc, query, orderBy, serverTimestamp
@@ -12,12 +12,11 @@ import {
   signInWithEmailAndPassword, onAuthStateChanged, signOut,
   setPersistence, browserLocalPersistence, browserSessionPersistence
 } from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js';
-import {
-  ref, uploadBytes, getDownloadURL
-} from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-storage.js';
-import {
-  getMessaging, getToken, onMessage, isSupported as isMessagingSupported
-} from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-messaging.js';
+
+// SDK Storage (~14KB) và Messaging (~9KB) không cần thiết để vẽ được màn
+// hình đầu tiên (đăng nhập / tổng quan) -> tải "lười" (import động) đúng lúc
+// dùng, thay vì chặn chung với các SDK bắt buộc (Firestore, Auth) ở trên.
+// Xem thêm mục "TẢI TRANG NHANH HƠN" phía cuối file.
 
 // UID các tài khoản được phép vào trang quản trị — thêm UID thứ 2 vào đây
 // khi tạo xong tài khoản cho người còn lại (nhớ cập nhật cả firestore.rules
@@ -267,24 +266,36 @@ document.getElementById('logoutBtn').addEventListener('click', function () {
   signOut(auth);
 });
 
+/*
+ * TẢI TRANG NHANH HƠN — tách "cần ngay" và "tải sau":
+ * - Cần ngay để vẽ được Tổng quan/Sản phẩm/Danh mục/Hộp thư: 4 promise
+ *   trong Promise.all bên dưới. Màn hình "Đang tải" chỉ chờ đúng 4 cái này.
+ * - Chưa cần ngay (chạy song song, không chặn màn hình chờ): phiên chatbot
+ *   (chỉ hiển thị ở trang Chatbot + 1 con số trên Tổng quan), danh sách
+ *   thiết bị nhận thông báo, và toàn bộ phần đăng ký thông báo đẩy — SDK
+ *   Messaging/Storage cũng chỉ tải khi thật sự dùng đến (xem getStorageLazy
+ *   trong firebase-init.js và getMessagingLazy ở trên).
+ */
 function startApp() {
   if (appStarted) {
     hideAppLoading();
     return;
   }
   appStarted = true;
-  listenAdminDevices();
-  initPushNotifications();
+
   Promise.all([
     listenCategories(),
     listenProducts(),
     listenMessages(),
-    listenChatSessions(),
     loadSettings()
   ]).then(function () {
     hideAppLoading();
     handleNotificationDeepLink();
   });
+
+  listenChatSessions();
+  listenAdminDevices();
+  initPushNotifications();
 }
 
 /**
@@ -747,10 +758,12 @@ function compressImageFile(file) {
 }
 
 function uploadToStorage(pathPrefix, file) {
-  return compressImageFile(file).then(function (blob) {
+  return Promise.all([compressImageFile(file), getStorageLazy()]).then(function (results) {
+    var blob = results[0];
+    var s = results[1];
     var path = pathPrefix + '/' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.jpg';
-    var storageRef = ref(storage, path);
-    return uploadBytes(storageRef, blob).then(function () { return getDownloadURL(storageRef); });
+    var storageRef = s.ref(s.storage, path);
+    return s.uploadBytes(storageRef, blob).then(function () { return s.getDownloadURL(storageRef); });
   });
 }
 
@@ -1893,32 +1906,46 @@ var NOTIFY_DEVICE_ID_KEY = 'khanhha_admin_device_id';
 var NOTIFY_DISMISSED_KEY = 'khanhha_admin_notify_dismissed';
 
 var fcmMessaging = null;
+var fcmModule = null;
+var fcmModulePromise = null;
 var adminDevicesCache = [];
+
+// SDK Messaging (~9KB) chỉ cần khi thật sự thiết lập thông báo đẩy -> tải
+// động, không nằm trong nhóm import bắt buộc ở đầu file.
+function getMessagingLazy() {
+  if (!fcmModulePromise) {
+    fcmModulePromise = import('https://www.gstatic.com/firebasejs/10.13.2/firebase-messaging.js')
+      .then(function (mod) { fcmModule = mod; return mod; });
+  }
+  return fcmModulePromise;
+}
 
 function initPushNotifications() {
   if (!('Notification' in window) || !('serviceWorker' in navigator)) return;
 
-  isMessagingSupported().then(function (supported) {
-    if (!supported) {
-      console.warn('Trình duyệt này không hỗ trợ Firebase Messaging (bình thường với 1 số trình duyệt/chế độ riêng tư).');
-      return;
-    }
-    fcmMessaging = getMessaging();
+  getMessagingLazy().then(function (mod) {
+    return mod.isSupported().then(function (supported) {
+      if (!supported) {
+        console.warn('Trình duyệt này không hỗ trợ Firebase Messaging (bình thường với 1 số trình duyệt/chế độ riêng tư).');
+        return;
+      }
+      fcmMessaging = mod.getMessaging();
 
-    onMessage(fcmMessaging, function (payload) {
-      var data = payload.data || {};
-      showToast((data.title || 'Có tin nhắn mới') + (data.body ? ' — ' + data.body : ''));
-      playNotifySound();
-      updateNotifyBadge();
+      mod.onMessage(fcmMessaging, function (payload) {
+        var data = payload.data || {};
+        showToast((data.title || 'Có tin nhắn mới') + (data.body ? ' — ' + data.body : ''));
+        playNotifySound();
+        updateNotifyBadge();
+      });
+
+      if (Notification.permission === 'granted') {
+        registerPushDevice();
+      } else if (Notification.permission === 'default') {
+        var dismissed = false;
+        try { dismissed = localStorage.getItem(NOTIFY_DISMISSED_KEY) === '1'; } catch (e) { /* ignore */ }
+        if (!dismissed) document.getElementById('notifyPromptOverlay').classList.add('open');
+      }
     });
-
-    if (Notification.permission === 'granted') {
-      registerPushDevice();
-    } else if (Notification.permission === 'default') {
-      var dismissed = false;
-      try { dismissed = localStorage.getItem(NOTIFY_DISMISSED_KEY) === '1'; } catch (e) { /* ignore */ }
-      if (!dismissed) document.getElementById('notifyPromptOverlay').classList.add('open');
-    }
   }).catch(function (err) {
     console.warn('Không kiểm tra được hỗ trợ Firebase Messaging:', err);
   });
@@ -1965,7 +1992,7 @@ function registerPushDevice() {
   }
 
   navigator.serviceWorker.register('firebase-messaging-sw.js').then(function (registration) {
-    return getToken(fcmMessaging, { vapidKey: FCM_VAPID_KEY, serviceWorkerRegistration: registration });
+    return fcmModule.getToken(fcmMessaging, { vapidKey: FCM_VAPID_KEY, serviceWorkerRegistration: registration });
   }).then(function (token) {
     if (token) saveDeviceToken(token);
   }).catch(function (err) {

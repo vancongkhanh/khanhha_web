@@ -8,13 +8,10 @@
    cấu hình cửa hàng, danh mục, sản phẩm và ghi tin nhắn liên hệ.
    ===================================================================== */
 
-import { db, storage } from './firebase-init.js';
+import { db, getStorageLazy } from './firebase-init.js';
 import {
   collection, getDocs, getDoc, doc, query, where, orderBy, addDoc, setDoc, serverTimestamp, arrayUnion
 } from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js';
-import {
-  ref, uploadBytes, getDownloadURL
-} from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-storage.js';
 
 /* ---------------------------------------------------------------------
    SITE_CONFIG — toàn bộ nội dung có thể thay đổi của website. Giá trị
@@ -1135,10 +1132,12 @@ function compressContactImage(file) {
 }
 
 function uploadContactImage(file) {
-  return compressContactImage(file).then(function (blob) {
+  return Promise.all([compressContactImage(file), getStorageLazy()]).then(function (results) {
+    var blob = results[0];
+    var s = results[1];
     var path = 'messages/' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.jpg';
-    var storageRef = ref(storage, path);
-    return uploadBytes(storageRef, blob).then(function () { return getDownloadURL(storageRef); });
+    var storageRef = s.ref(s.storage, path);
+    return s.uploadBytes(storageRef, blob).then(function () { return s.getDownloadURL(storageRef); });
   });
 }
 
