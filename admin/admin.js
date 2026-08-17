@@ -283,7 +283,22 @@ function startApp() {
     loadSettings()
   ]).then(function () {
     hideAppLoading();
+    handleNotificationDeepLink();
   });
+}
+
+/**
+ * Bấm vào thông báo push (?messageId=... trong URL khi mở/điều hướng từ
+ * service worker) -> mở luôn khung chi tiết đúng tin nhắn đó.
+ */
+function handleNotificationDeepLink() {
+  var params = new URLSearchParams(window.location.search);
+  var messageId = params.get('messageId');
+  if (!messageId) return;
+  goToMessageDetail(messageId);
+  params.delete('messageId');
+  var rest = params.toString();
+  window.history.replaceState({}, '', window.location.pathname + (rest ? '?' + rest : ''));
 }
 
 /* =======================================================================

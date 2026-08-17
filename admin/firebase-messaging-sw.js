@@ -45,6 +45,13 @@ self.addEventListener('notificationclick', function (event) {
       for (var i = 0; i < clientList.length; i++) {
         var client = clientList[i];
         if (client.url.indexOf('/admin') !== -1 && 'focus' in client) {
+          // Tab admin đang mở sẵn -> điều hướng luôn tới tin nhắn đó rồi focus,
+          // thay vì chỉ focus vào trang đang hiển thị dở (không có messageId).
+          if ('navigate' in client) {
+            return client.navigate(url).then(function (navigated) {
+              return (navigated || client).focus();
+            });
+          }
           return client.focus();
         }
       }

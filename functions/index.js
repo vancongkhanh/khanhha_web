@@ -58,7 +58,7 @@ exports.onNewMessageNotify = onDocumentCreated('messages/{messageId}', async (ev
       title: 'Khánh Hà — Tin nhắn mới',
       body,
       messageId,
-      click_action: '/admin/index.html'
+      click_action: '/admin/index.html?messageId=' + messageId
     }
   });
 
