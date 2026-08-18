@@ -179,6 +179,21 @@ function editIcon() {
 function trashIcon() {
   return '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.6"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>';
 }
+function callIcon() {
+  return '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.6"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3.1-8.6A2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.8.6 2.7a2 2 0 0 1-.5 2.1L8 9.7a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.5 2.7.6a2 2 0 0 1 1.7 2Z"/></svg>';
+}
+function zaloIcon() {
+  return '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>';
+}
+function cameraIcon() {
+  return '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z"/><circle cx="12" cy="13.5" r="3.2"/></svg>';
+}
+function checkIcon() {
+  return '<svg viewBox="0 0 24 24" fill="none" stroke-width="2.4"><path d="M5 12l5 5L20 7"/></svg>';
+}
+function starIcon(on) {
+  return '<svg viewBox="0 0 24 24" fill="' + (on ? 'currentColor' : 'none') + '" stroke-width="1.6"><path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.4l-5.9 3.2 1.3-6.6-4.9-4.6 6.6-.8Z"/></svg>';
+}
 
 /* =======================================================================
    ĐĂNG NHẬP / ĐĂNG XUẤT
@@ -583,6 +598,8 @@ function renderProducts() {
 
   if (!catalogLoaded) {
     tbody.innerHTML = '<tr><td colspan="6"><p class="hint" style="padding:20px 0;text-align:center;">Đang tải dữ liệu...</p></td></tr>';
+    var loadingCards = document.getElementById('productsCards');
+    if (loadingCards) loadingCards.innerHTML = '<p class="hint" style="text-align:center;">Đang tải dữ liệu...</p>';
     var loadingSubtitle = document.getElementById('productsSubtitle');
     if (loadingSubtitle) loadingSubtitle.textContent = 'Đang tải...';
     var pagination = document.getElementById('productsPagination');
@@ -602,6 +619,8 @@ function renderProducts() {
 
   if (!filtered.length) {
     tbody.innerHTML = '<tr><td colspan="6"><p class="hint" style="padding:20px 0;text-align:center;">Không có sản phẩm khớp bộ lọc.</p></td></tr>';
+    var emptyCards = document.getElementById('productsCards');
+    if (emptyCards) emptyCards.innerHTML = '<p class="hint" style="text-align:center;">Không có sản phẩm khớp bộ lọc.</p>';
     return;
   }
 
@@ -626,6 +645,33 @@ function renderProducts() {
       '<button class="icon-btn" title="Xoá" onclick="adminOpenDeleteConfirm(\'product\',\'' + p.id + '\')">' + trashIcon() + '</button>' +
       '</div></td></tr>';
   }).join('');
+
+  var cardsEl = document.getElementById('productsCards');
+  if (cardsEl) {
+    cardsEl.innerHTML = pageItems.map(function (p, i) {
+      var color = THUMB_COLORS[i % THUMB_COLORS.length];
+      var hasImage = p.images && p.images.length > 0;
+      var thumbStyle = hasImage
+        ? "background-image:url('" + storagePathToUrl(p.images[0]) + "');background-size:cover;background-position:center;"
+        : 'background:' + color + ';color:#fff;';
+      var iconSvg2 = hasImage ? '' : '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.5">' + (CATEGORY_ICONS[categoryIconKey(p.category)] || '') + '</svg>';
+      return '<div class="m-card">' +
+        '<div class="m-top">' +
+        '<div class="m-thumb" style="' + thumbStyle + '">' + iconSvg2 + '</div>' +
+        '<div class="m-info"><div class="m-name">' + escapeHtml(p.name) + '</div><span class="m-tag">' + escapeHtml(categoryName(p.category)) + '</span></div>' +
+        '<div class="m-acts">' +
+        '<button aria-label="Sửa" onclick="adminOpenProductModal(\'edit\',\'' + p.id + '\')">' + editIcon() + '</button>' +
+        '<button class="m-del" aria-label="Xoá" onclick="adminOpenDeleteConfirm(\'product\',\'' + p.id + '\')">' + trashIcon() + '</button>' +
+        '</div></div>' +
+        '<div class="m-div"></div>' +
+        '<div class="m-bottom">' +
+        '<span class="m-price">' + formatVND(p.price) + '</span>' +
+        '<div class="m-right">' +
+        '<button class="stock-pill ' + (p.stock ? 'on' : 'off') + '" onclick="adminToggleProductField(\'' + p.id + '\',\'stock\',' + (!p.stock) + ')">' + (p.stock ? checkIcon() : closeXIcon()) + (p.stock ? 'Còn hàng' : 'Hết hàng') + '</button>' +
+        '<button class="star-btn ' + (p.isFeatured ? 'on' : '') + '" onclick="adminToggleProductField(\'' + p.id + '\',\'featured\',' + (!p.isFeatured) + ')" aria-label="Bán chạy">' + starIcon(p.isFeatured) + '</button>' +
+        '</div></div></div>';
+    }).join('');
+  }
 }
 
 document.getElementById('pfilter-search').addEventListener('input', function () {
@@ -894,7 +940,7 @@ function renderCategories() {
     var count = productsCache.filter(function (p) { return p.category === c.slug; }).length;
     return '<div class="card cat-admin-card">' +
       '<div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.6">' + (CATEGORY_ICONS[c.icon] || CATEGORY_ICONS.pot) + '</svg></div>' +
-      '<div class="info"><div class="name">' + escapeHtml(c.name) + '</div><div class="count">' + count + ' sản phẩm</div></div>' +
+      '<div class="info"><div class="name">' + escapeHtml(c.name) + '</div><span class="count-pill">' + count + ' sản phẩm</span></div>' +
       '<button class="icon-btn" title="Sửa" onclick="adminOpenCategoryModal(\'edit\',\'' + c.slug + '\')">' + editIcon() + '</button>' +
       '<button class="icon-btn" title="Xoá" onclick="adminOpenDeleteConfirm(\'category\',\'' + c.slug + '\')">' + trashIcon() + '</button>' +
       '</div>';
@@ -1043,6 +1089,7 @@ function goToMessagePage(page) {
 
 function renderMessages() {
   var list = document.getElementById('messagesList');
+  var cardsEl = document.getElementById('messagesCards');
   if (!list) return;
 
   var filtered = applyMessageFilters(messagesCache);
@@ -1051,6 +1098,7 @@ function renderMessages() {
   if (!filtered.length) {
     var emptyMsg = messageFilters.status ? 'Không có tin nhắn khớp bộ lọc.' : 'Chưa có tin nhắn nào.';
     list.innerHTML = '<p class="hint" style="padding:20px;">' + emptyMsg + '</p>';
+    if (cardsEl) cardsEl.innerHTML = '<p class="hint" style="text-align:center;">' + emptyMsg + '</p>';
     return;
   }
 
@@ -1079,6 +1127,35 @@ function renderMessages() {
       '<button class="icon-btn" title="Xoá tin nhắn" onclick="event.stopPropagation();adminOpenDeleteConfirm(\'message\',\'' + m.id + '\')">' + trashIcon() + '</button>' +
       '</div></div></div>';
   }).join('') || '<p class="hint" style="padding:20px;">Chưa có tin nhắn nào.</p>';
+
+  if (cardsEl) {
+    cardsEl.innerHTML = pageItems.map(function (m) {
+      var badgeCls = m.status === 'moi' ? 'new' : 'done';
+      var badgeLabel = m.status === 'moi' ? 'Mới' : 'Đã liên hệ';
+      var phoneDigits = (m.phone || '').replace(/[^0-9+]/g, '');
+      var telHref = 'tel:' + phoneDigits;
+      var zaloHref = 'https://zalo.me/' + phoneDigits;
+      var photoCount = messageImageList(m).length;
+      var isUnread = !m.read;
+      return '<div class="m-card clickable-row' + (isUnread ? ' msg-unread' : ' msg-read') + '" onclick="adminOpenMessageDetail(\'' + m.id + '\')">' +
+        '<div class="m-top">' +
+        '<div class="m-thumb" style="background:var(--pine-pale);color:var(--pine);">' + escapeHtml((m.name || '?').charAt(0)) + '</div>' +
+        '<div class="m-info"><div class="m-name m-name-1">' + (isUnread ? '<span class="unread-dot" title="Chưa đọc"></span>' : '') + escapeHtml(m.name) + '</div><div class="m-sub">' + escapeHtml(m.phone) + ' · ' + formatRelativeTime(m.createdAt) + '</div></div>' +
+        '</div>' +
+        '<div class="m-div"></div>' +
+        '<div class="m-clamp2" style="margin-bottom:10px;">' + escapeHtml(m.content) + '</div>' +
+        '<div class="m-bottom">' +
+        '<div style="display:flex;align-items:center;gap:8px;">' +
+        '<span class="status-pill ' + badgeCls + '">' + badgeLabel + '</span>' +
+        (photoCount ? '<span class="cam-tag">' + cameraIcon() + photoCount + ' ảnh</span>' : '') +
+        '</div>' +
+        '<div class="m-acts">' +
+        '<a href="' + telHref + '" aria-label="Gọi" onclick="event.stopPropagation()">' + callIcon() + '</a>' +
+        '<a href="' + zaloHref + '" target="_blank" rel="noopener" aria-label="Nhắn Zalo" onclick="event.stopPropagation()">' + zaloIcon() + '</a>' +
+        '<button class="m-del" aria-label="Xoá" onclick="event.stopPropagation();adminOpenDeleteConfirm(\'message\',\'' + m.id + '\')">' + trashIcon() + '</button>' +
+        '</div></div></div>';
+    }).join('');
+  }
 }
 
 document.getElementById('mfilter-pagesize').addEventListener('change', function () {
@@ -1123,6 +1200,7 @@ function goToDashboardMsgPage(page) {
 
 function renderRecentMessages() {
   var list = document.getElementById('recentMessagesList');
+  var cardsEl = document.getElementById('recentMessagesCards');
   if (!list) return;
 
   var newMessages = messagesCache.filter(function (m) { return m.status === 'moi'; });
@@ -1130,6 +1208,7 @@ function renderRecentMessages() {
 
   if (!newMessages.length) {
     list.innerHTML = '<p class="hint">Chưa có tin nhắn mới nào.</p>';
+    if (cardsEl) cardsEl.innerHTML = '<p class="hint">Chưa có tin nhắn mới nào.</p>';
     return;
   }
 
@@ -1144,6 +1223,19 @@ function renderRecentMessages() {
       '<div class="msg-content">' + escapeHtml(m.content) + '</div>' +
       '</div></div>';
   }).join('');
+
+  if (cardsEl) {
+    cardsEl.innerHTML = pageItems.map(function (m) {
+      return '<div class="m-card clickable-row" onclick="adminGoToMessageDetail(\'' + m.id + '\')">' +
+        '<div class="m-top">' +
+        '<div class="m-thumb" style="background:var(--pine-pale);color:var(--pine);">' + escapeHtml((m.name || '?').charAt(0)) + '</div>' +
+        '<div class="m-info"><div class="m-name m-name-1">' + escapeHtml(m.name) + '</div><div class="m-sub">' + formatRelativeTime(m.createdAt) + '</div></div>' +
+        '</div>' +
+        '<div class="m-div"></div>' +
+        '<div class="m-clamp2">' + escapeHtml(m.content) + '</div>' +
+        '</div>';
+    }).join('');
+  }
 }
 
 document.getElementById('dfilter-pagesize').addEventListener('change', function () {
@@ -1202,12 +1294,14 @@ function goToChatSessionPage(page) {
 
 function renderChatSessions() {
   var list = document.getElementById('chatSessionsList');
+  var cardsEl = document.getElementById('chatSessionsCards');
   if (!list) return;
 
   renderChatSessionsPagination(chatSessionsCache.length);
 
   if (!chatSessionsCache.length) {
     list.innerHTML = '<p class="hint" style="padding:20px;">Chưa có phiên chat nào.</p>';
+    if (cardsEl) cardsEl.innerHTML = '<p class="hint" style="text-align:center;">Chưa có phiên chat nào.</p>';
     return;
   }
 
@@ -1225,6 +1319,23 @@ function renderChatSessions() {
       '<div class="msg-content">' + escapeHtml(summary) + '</div>' +
       '</div></div>';
   }).join('');
+
+  if (cardsEl) {
+    cardsEl.innerHTML = pageItems.map(function (s) {
+      var events = s.events || [];
+      var lastEvent = events.length ? events[events.length - 1] : null;
+      var summary = lastEvent ? formatChatEvent(lastEvent) : 'Chưa có hoạt động';
+      return '<div class="m-card clickable-row" onclick="adminOpenChatSessionDetail(\'' + s.id + '\')">' +
+        '<div class="m-top">' +
+        '<div class="m-thumb" style="background:var(--pine-pale);color:var(--pine);">' + zaloIcon() + '</div>' +
+        '<div class="m-info"><div class="m-name m-name-1">Khách #' + escapeHtml(s.id.slice(-6)) + '</div><div class="m-sub">' + formatRelativeTime(s.updatedAt) + '</div></div>' +
+        '<span class="count-pill" style="background:var(--pine-pale);border-color:var(--pine-pale);color:var(--pine);font-weight:700;">' + events.length + '</span>' +
+        '</div>' +
+        '<div class="m-div"></div>' +
+        '<div class="m-clamp2" style="-webkit-line-clamp:1;">' + escapeHtml(summary) + '</div>' +
+        '</div>';
+    }).join('');
+  }
 }
 
 document.getElementById('csfilter-pagesize').addEventListener('change', function () {
