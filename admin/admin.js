@@ -1107,17 +1107,15 @@ function renderMessages() {
 
   list.innerHTML = pageItems.map(function (m) {
     var badgeClass = m.status === 'moi' ? 'badge-warn' : 'badge-ok';
-    var badgeLabel = m.status === 'moi' ? 'Mới' : 'Đã liên hệ';
+    var badgeLabel = m.status === 'moi' ? 'Chưa liên hệ' : 'Đã liên hệ';
     var phoneDigits = (m.phone || '').replace(/[^0-9+]/g, '');
     var telHref = 'tel:' + phoneDigits;
     var zaloHref = 'https://zalo.me/' + phoneDigits;
     var imageTag = m.imageUrl ? ' <span title="Có ảnh đính kèm">📷</span>' : '';
-    var isUnread = !m.read;
-    var unreadDot = isUnread ? '<span class="unread-dot" title="Chưa đọc"></span>' : '';
-    return '<div class="msg-item clickable-row' + (isUnread ? ' msg-unread' : ' msg-read') + '" onclick="adminOpenMessageDetail(\'' + m.id + '\')">' +
+    return '<div class="msg-item clickable-row" onclick="adminOpenMessageDetail(\'' + m.id + '\')">' +
       '<div class="msg-avatar">' + escapeHtml((m.name || '?').charAt(0)) + '</div>' +
       '<div class="msg-body">' +
-      '<div class="msg-top"><span class="name">' + unreadDot + escapeHtml(m.name) + ' — ' + escapeHtml(m.phone) + '</span><span class="time">' + formatRelativeTime(m.createdAt) + '</span></div>' +
+      '<div class="msg-top"><span class="name">' + escapeHtml(m.name) + ' — ' + escapeHtml(m.phone) + '</span><span class="time">' + formatRelativeTime(m.createdAt) + '</span></div>' +
       '<div class="msg-content">' + escapeHtml(m.content) + imageTag + '</div>' +
       '<div class="msg-actions">' +
       '<span class="badge ' + badgeClass + '">' + badgeLabel + '</span>' +
@@ -1131,16 +1129,15 @@ function renderMessages() {
   if (cardsEl) {
     cardsEl.innerHTML = pageItems.map(function (m) {
       var badgeCls = m.status === 'moi' ? 'new' : 'done';
-      var badgeLabel = m.status === 'moi' ? 'Mới' : 'Đã liên hệ';
+      var badgeLabel = m.status === 'moi' ? 'Chưa liên hệ' : 'Đã liên hệ';
       var phoneDigits = (m.phone || '').replace(/[^0-9+]/g, '');
       var telHref = 'tel:' + phoneDigits;
       var zaloHref = 'https://zalo.me/' + phoneDigits;
       var photoCount = messageImageList(m).length;
-      var isUnread = !m.read;
-      return '<div class="m-card clickable-row' + (isUnread ? ' msg-unread' : ' msg-read') + '" onclick="adminOpenMessageDetail(\'' + m.id + '\')">' +
+      return '<div class="m-card clickable-row" onclick="adminOpenMessageDetail(\'' + m.id + '\')">' +
         '<div class="m-top">' +
         '<div class="m-thumb" style="background:var(--pine-pale);color:var(--pine);">' + escapeHtml((m.name || '?').charAt(0)) + '</div>' +
-        '<div class="m-info"><div class="m-name m-name-1">' + (isUnread ? '<span class="unread-dot" title="Chưa đọc"></span>' : '') + escapeHtml(m.name) + '</div><div class="m-sub">' + escapeHtml(m.phone) + ' · ' + formatRelativeTime(m.createdAt) + '</div></div>' +
+        '<div class="m-info"><div class="m-name m-name-1">' + escapeHtml(m.name) + '</div><div class="m-sub">' + escapeHtml(m.phone) + ' · ' + formatRelativeTime(m.createdAt) + '</div></div>' +
         '</div>' +
         '<div class="m-div"></div>' +
         '<div class="m-clamp2" style="margin-bottom:10px;">' + escapeHtml(m.content) + '</div>' +
@@ -1447,7 +1444,7 @@ function openMessageDetail(id) {
     '<div style="margin-top:16px;"><label style="font-size:12.5px;font-weight:600;">Nội dung khách gửi</label><p style="font-size:14px;margin-top:6px;line-height:1.6;white-space:pre-line;word-break:break-word;">' + linkifyText(m.content) + '</p>' + productInfoBtnHtml + '</div>' +
     attachHtml +
     '<div style="margin-top:18px;"><label style="font-size:12.5px;font-weight:600;">Trạng thái</label><div class="status-select">' +
-    '<div class="status-opt ' + (m.status === 'moi' ? 'selected new' : '') + '" onclick="adminSetMessageStatus(\'' + m.id + '\',\'moi\')">Mới</div>' +
+    '<div class="status-opt ' + (m.status === 'moi' ? 'selected new' : '') + '" onclick="adminSetMessageStatus(\'' + m.id + '\',\'moi\')">Chưa liên hệ</div>' +
     '<div class="status-opt ' + (m.status === 'da_lien_he' ? 'selected done' : '') + '" onclick="adminSetMessageStatus(\'' + m.id + '\',\'da_lien_he\')">Đã liên hệ</div>' +
     '</div></div>' +
     '<div style="margin-top:14px;"><label style="font-size:12.5px;font-weight:600;">Ghi chú nội bộ (khách không thấy)</label>' +
