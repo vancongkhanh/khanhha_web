@@ -1900,7 +1900,7 @@ function renderSpacesEditor() {
             '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>' +
             '<span>Kéo ảnh vào đây hoặc bấm để chọn — có thể chọn nhiều ảnh</span>' +
           '</div>' +
-          '<input type="file" id="space-image-file-' + idx + '" accept="image/*" multiple style="display:none;">' +
+          '<input type="file" id="space-image-file-' + idx + '" accept="image/*" multiple class="file-input-hidden">' +
           '<div class="hero-slides-list">' + imagesHtml + '</div>' +
         '</div>' +
       '</div>' +
