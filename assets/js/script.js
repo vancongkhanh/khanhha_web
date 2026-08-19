@@ -36,7 +36,8 @@ var SITE_CONFIG = {
       titleLine2: 'mỗi góc nhà',
       description: 'Khánh Hà chọn lọc đồ bếp, đồ điện gia dụng, kệ tủ inox và đồ nhựa bền chắc — mang sự gọn gàng, tiện lợi đến từng gia đình ở Phan Thiết.'
     },
-    priceDisplayMode: 'show'
+    priceDisplayMode: 'show',
+    showProductsWithoutImages: false
   },
   store: {
     address: 'Km 3, xã Hàm Liêm, tỉnh Lâm Đồng',
@@ -93,6 +94,14 @@ function applySiteConfig() {
 }
 
 /**
+ * Promise của lần tải cấu hình cửa hàng — gán khi loadSiteConfig() chạy
+ * (trong DOMContentLoaded bên dưới). fetchProducts() cần chờ đúng promise
+ * này trước khi quyết định lọc sản phẩm chưa có ảnh, để không bị lỗi thời
+ * điểm (gọi trước khi cấu hình thật từ Firestore kịp tải xong).
+ */
+var siteConfigPromise = null;
+
+/**
  * Tải document settings/main từ Firestore, thay thế SITE_CONFIG mặc định
  * bằng dữ liệu thật do chủ shop tự chỉnh trong trang Admin.
  */
@@ -130,8 +139,8 @@ document.addEventListener('DOMContentLoaded', function () {
   refreshSpacesSection();
   initZaloFollow();
   initContactForm();
-  var configPromise = loadSiteConfig();
-  initHomepageData(configPromise);
+  siteConfigPromise = loadSiteConfig();
+  initHomepageData(siteConfigPromise);
   initProductsPageData();
   initProductDetailPage();
   initGalleryPageData();
@@ -619,7 +628,18 @@ async function fetchProducts(opts) {
   if (opts.featuredOnly) constraints.push(where('isFeatured', '==', true));
   if (opts.category) constraints.push(where('category', '==', opts.category));
   var snap = await getDocs(query(collection(db, 'products'), ...constraints));
-  return snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+  var products = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+
+  // Chờ đúng cấu hình thật từ Firestore (không dùng SITE_CONFIG mặc định
+  // lúc hàm này được gọi song song với loadSiteConfig()) trước khi quyết
+  // định có lọc sản phẩm chưa có ảnh khỏi danh sách hiển thị cho khách hay
+  // không — trang Admin không gọi qua hàm này nên luôn hiện đủ như cũ.
+  var config = siteConfigPromise ? await siteConfigPromise : SITE_CONFIG;
+  var showWithoutImages = !!(config && config.appearance && config.appearance.showProductsWithoutImages);
+  if (!showWithoutImages) {
+    products = products.filter(function (p) { return p.images && p.images.length > 0; });
+  }
+  return products;
 }
 
 function renderCategoryGrid(container, categories) {

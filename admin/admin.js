@@ -1693,6 +1693,10 @@ function populateSettingsForms(s) {
   document.getElementById('set-heroDesc').value = hero.description || '';
   document.getElementById('set-featuredLimit').value = appearance.featuredLimit || 8;
   document.getElementById('set-priceDisplayMode').value = appearance.priceDisplayMode || 'show';
+  document.getElementById('set-showProductsWithoutImage').checked = !!appearance.showProductsWithoutImages;
+  document.getElementById('set-showProductsWithoutImageLabel').textContent = appearance.showProductsWithoutImages
+    ? 'Đang bật — sản phẩm chưa có ảnh vẫn hiện trên website'
+    : 'Đang tắt — sản phẩm chưa có ảnh (kể cả Bán chạy) sẽ bị ẩn khỏi website';
   heroSlidesDraft = (appearance.heroSlides || []).map(function (s) { return Object.assign({}, s); });
   renderHeroSlidesEditor();
 
@@ -2016,6 +2020,12 @@ document.getElementById('set-showShipping').addEventListener('change', function 
   document.getElementById('set-showShippingLabel').textContent = this.checked ? 'Đang bật' : 'Đang tắt';
 });
 
+document.getElementById('set-showProductsWithoutImage').addEventListener('change', function () {
+  document.getElementById('set-showProductsWithoutImageLabel').textContent = this.checked
+    ? 'Đang bật — sản phẩm chưa có ảnh vẫn hiện trên website'
+    : 'Đang tắt — sản phẩm chưa có ảnh (kể cả Bán chạy) sẽ bị ẩn khỏi website';
+});
+
 function saveSettingsAppearance(btn) {
   var appearance = {
     logo: pendingLogoUrl || (settingsCache && settingsCache.appearance && settingsCache.appearance.logo) || '',
@@ -2030,6 +2040,7 @@ function saveSettingsAppearance(btn) {
     },
     featuredLimit: Number(document.getElementById('set-featuredLimit').value) || 8,
     priceDisplayMode: document.getElementById('set-priceDisplayMode').value || 'show',
+    showProductsWithoutImages: document.getElementById('set-showProductsWithoutImage').checked,
     heroSlides: heroSlidesDraft,
     spaces: spacesDraft.map(function (sp) {
       return Object.assign({}, sp, { bullets: (sp.bullets || []).filter(function (b) { return b.trim(); }) });
