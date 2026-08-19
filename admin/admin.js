@@ -597,7 +597,7 @@ function renderProducts() {
   if (!tbody) return;
 
   if (!catalogLoaded) {
-    tbody.innerHTML = '<tr><td colspan="6"><p class="hint" style="padding:20px 0;text-align:center;">Đang tải dữ liệu...</p></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7"><p class="hint" style="padding:20px 0;text-align:center;">Đang tải dữ liệu...</p></td></tr>';
     var loadingCards = document.getElementById('productsCards');
     if (loadingCards) loadingCards.innerHTML = '<p class="hint" style="text-align:center;">Đang tải dữ liệu...</p>';
     var loadingSubtitle = document.getElementById('productsSubtitle');
@@ -618,7 +618,7 @@ function renderProducts() {
   renderProductsPagination(filtered.length);
 
   if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="6"><p class="hint" style="padding:20px 0;text-align:center;">Không có sản phẩm khớp bộ lọc.</p></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7"><p class="hint" style="padding:20px 0;text-align:center;">Không có sản phẩm khớp bộ lọc.</p></td></tr>';
     var emptyCards = document.getElementById('productsCards');
     if (emptyCards) emptyCards.innerHTML = '<p class="hint" style="text-align:center;">Không có sản phẩm khớp bộ lọc.</p>';
     return;
@@ -637,6 +637,7 @@ function renderProducts() {
     return '<tr>' +
       '<td data-label="Sản phẩm"><div class="cell-name"><div class="prod-thumb-sm" style="' + thumbStyle + '">' + iconSvg + '</div>' + escapeHtml(p.name) + '</div></td>' +
       '<td data-label="Danh mục">' + escapeHtml(categoryName(p.category)) + '</td>' +
+      '<td data-label="Giá vốn">' + (p.costPrice ? formatVND(p.costPrice) : '—') + '</td>' +
       '<td data-label="Giá">' + formatVND(p.price) + '</td>' +
       '<td data-label="Còn hàng"><label class="switch"><input type="checkbox" ' + (p.stock ? 'checked' : '') + ' onchange="adminToggleProductField(\'' + p.id + '\',\'stock\',this.checked)"><span class="slider"></span></label></td>' +
       '<td data-label="Bán chạy"><label class="switch"><input type="checkbox" ' + (p.isFeatured ? 'checked' : '') + ' onchange="adminToggleProductField(\'' + p.id + '\',\'featured\',this.checked)"><span class="slider"></span></label></td>' +
@@ -665,7 +666,7 @@ function renderProducts() {
         '</div></div>' +
         '<div class="m-div"></div>' +
         '<div class="m-bottom">' +
-        '<span class="m-price">' + formatVND(p.price) + '</span>' +
+        '<div>' + (p.costPrice ? '<div class="m-costprice">Vốn ' + formatVND(p.costPrice) + '</div>' : '') + '<span class="m-price">' + formatVND(p.price) + '</span></div>' +
         '<div class="m-right">' +
         '<button class="stock-pill ' + (p.stock ? 'on' : 'off') + '" onclick="adminToggleProductField(\'' + p.id + '\',\'stock\',' + (!p.stock) + ')">' + (p.stock ? checkIcon() : closeXIcon()) + (p.stock ? 'Còn hàng' : 'Hết hàng') + '</button>' +
         '<button class="star-btn ' + (p.isFeatured ? 'on' : '') + '" onclick="adminToggleProductField(\'' + p.id + '\',\'featured\',' + (!p.isFeatured) + ')" aria-label="Bán chạy">' + starIcon(p.isFeatured) + '</button>' +
@@ -742,6 +743,7 @@ function openProductModal(mode, id) {
     '<div class="modal-body"><div class="form-grid">' +
     '<div class="form-field full"><label>Tên sản phẩm</label><input id="pf-name" value="' + escapeHtml(product ? product.name : '') + '" placeholder="Ví dụ: Bộ nồi inox 3 đáy 5 món"></div>' +
     '<div class="form-field"><label>Danh mục</label><select id="pf-category" style="padding:10px 12px;border-radius:8px;border:1.5px solid var(--border);font-size:13.5px;">' + catOptions + '</select></div>' +
+    '<div class="form-field"><label>Giá vốn (₫)</label><input id="pf-costprice" type="text" inputmode="numeric" value="' + numToInputStr(product && product.costPrice ? product.costPrice : '') + '" placeholder="Để trống nếu chưa rõ"></div>' +
     '<div class="form-field"><label>Giá bán (₫)</label><input id="pf-price" type="text" inputmode="numeric" value="' + numToInputStr(product ? product.price : '') + '" placeholder="890.000"></div>' +
     '<div class="form-field"><label>Giá gốc (nếu giảm giá)</label><input id="pf-oldprice" type="text" inputmode="numeric" value="' + numToInputStr(product && product.oldPrice ? product.oldPrice : '') + '" placeholder="Để trống nếu không giảm giá"></div>' +
     '<div class="form-field"><label>Trạng thái</label><div style="display:flex;gap:18px;padding-top:8px;">' +
@@ -762,6 +764,7 @@ function openProductModal(mode, id) {
     '<div class="modal-foot"><button class="btn btn-outline" onclick="adminCloseModal()">Huỷ</button><button class="btn btn-primary" id="pf-save-btn" onclick="adminSaveProduct(' + (product ? "'" + product.id + "'" : 'null') + ',this)">Lưu sản phẩm</button></div>';
 
   renderProductImageSlots();
+  formatNumberInput(document.getElementById('pf-costprice'));
   formatNumberInput(document.getElementById('pf-price'));
   formatNumberInput(document.getElementById('pf-oldprice'));
   openModal();
@@ -893,6 +896,7 @@ function saveProduct(id, btn) {
   var data = {
     name: name,
     category: document.getElementById('pf-category').value,
+    costPrice: document.getElementById('pf-costprice').value ? parseFormattedNumber(document.getElementById('pf-costprice').value) : null,
     price: parseFormattedNumber(document.getElementById('pf-price').value),
     oldPrice: document.getElementById('pf-oldprice').value ? parseFormattedNumber(document.getElementById('pf-oldprice').value) : null,
     stock: document.getElementById('pf-stock').checked,
