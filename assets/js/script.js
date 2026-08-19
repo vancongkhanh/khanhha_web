@@ -351,7 +351,7 @@ function renderSpacesFromConfig() {
     var images = s.images || [];
     var slidesHtml = images.length
       ? images.map(function (img, idx) {
-          return '<div class="slide' + (idx === 0 ? ' active' : '') + '"><div class="slide-photo"><img src="' + storagePathToUrl(img) + '" alt="' + escapeHtml(s.tabLabel || '') + '"></div></div>';
+          return '<div class="slide' + (idx === 0 ? ' active' : '') + '"><div class="slide-photo"><img src="' + storagePathToUrl(img) + '" alt="' + escapeHtml(s.tabLabel || '') + '" loading="lazy"></div></div>';
         }).join('')
       : '<div class="slide active"><div class="slide-photo" style="display:flex;align-items:center;justify-content:center;background:var(--pine);"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.3" stroke="var(--copper-light)" style="width:64px;height:64px;"><path d="M4 16l4.5-6 4 5 3-3L20 16"/><rect x="3" y="4" width="18" height="16" rx="2"/></svg></div></div>';
 
@@ -674,9 +674,11 @@ function renderProductGrid(container, products, categories) {
   container.innerHTML = products.map(function (p, i) {
     var cat = catMap[p.category] || {};
     var hasImage = p.images && p.images.length > 0;
-    var thumbStyle = hasImage
-      ? "background-image:url('" + storagePathToUrl(p.images[0]) + "');background-size:cover;background-position:center;"
-      : 'background:' + PROD_THUMB_COLORS[i % PROD_THUMB_COLORS.length] + ';';
+    var thumbStyle = hasImage ? '' : 'background:' + PROD_THUMB_COLORS[i % PROD_THUMB_COLORS.length] + ';';
+    // <img loading="lazy"> thay vì CSS background-image — nền không tự
+    // trì hoãn tải theo khung nhìn, khiến cả lưới sản phẩm tải ảnh ngay
+    // lập tức dù đang ở ngoài màn hình, rất tốn băng thông trên di động.
+    var imgTag = hasImage ? '<img src="' + storagePathToUrl(p.images[0]) + '" alt="' + escapeHtml(p.name) + '" loading="lazy">' : '';
 
     var badge = '';
     if (p.oldPrice && getPriceDisplayMode() === 'show') {
@@ -689,7 +691,7 @@ function renderProductGrid(container, products, categories) {
     var icon = hasImage ? '' : categoryIconSvg(cat.icon, 1.5);
 
     return '<a class="prod-card" href="san-pham-chi-tiet.html?id=' + encodeURIComponent(p.id) + '" data-category="' + escapeHtml(p.category) + '">' +
-      '<div class="prod-thumb" style="' + thumbStyle + '">' + badge + icon + '</div>' +
+      '<div class="prod-thumb" style="' + thumbStyle + '">' + imgTag + badge + icon + '</div>' +
       '<div class="prod-body"><span class="cat">' + escapeHtml(cat.name || '') + '</span>' +
       '<h3>' + escapeHtml(p.name) + '</h3>' +
       renderPriceHtml(p, 'price') + '</div>' +

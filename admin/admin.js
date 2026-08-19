@@ -630,10 +630,10 @@ function renderProducts() {
   tbody.innerHTML = pageItems.map(function (p, i) {
     var color = THUMB_COLORS[i % THUMB_COLORS.length];
     var hasImage = p.images && p.images.length > 0;
-    var thumbStyle = hasImage
-      ? "background-image:url('" + storagePathToUrl(p.images[0]) + "');background-size:cover;background-position:center;"
-      : 'background:' + color;
-    var iconSvg = hasImage ? '' : '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.5">' + (CATEGORY_ICONS[categoryIconKey(p.category)] || '') + '</svg>';
+    var thumbStyle = hasImage ? '' : 'background:' + color;
+    var iconSvg = hasImage
+      ? '<img src="' + storagePathToUrl(p.images[0]) + '" alt="" loading="lazy">'
+      : '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.5">' + (CATEGORY_ICONS[categoryIconKey(p.category)] || '') + '</svg>';
     return '<tr>' +
       '<td data-label="Sản phẩm"><div class="cell-name"><div class="prod-thumb-sm" style="' + thumbStyle + '">' + iconSvg + '</div>' + escapeHtml(p.name) + '</div></td>' +
       '<td data-label="Danh mục">' + escapeHtml(categoryName(p.category)) + '</td>' +
@@ -652,10 +652,10 @@ function renderProducts() {
     cardsEl.innerHTML = pageItems.map(function (p, i) {
       var color = THUMB_COLORS[i % THUMB_COLORS.length];
       var hasImage = p.images && p.images.length > 0;
-      var thumbStyle = hasImage
-        ? "background-image:url('" + storagePathToUrl(p.images[0]) + "');background-size:cover;background-position:center;"
-        : 'background:' + color + ';color:#fff;';
-      var iconSvg2 = hasImage ? '' : '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.5">' + (CATEGORY_ICONS[categoryIconKey(p.category)] || '') + '</svg>';
+      var thumbStyle = hasImage ? '' : 'background:' + color + ';color:#fff;';
+      var iconSvg2 = hasImage
+        ? '<img src="' + storagePathToUrl(p.images[0]) + '" alt="" loading="lazy">'
+        : '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.5">' + (CATEGORY_ICONS[categoryIconKey(p.category)] || '') + '</svg>';
       return '<div class="m-card">' +
         '<div class="m-top">' +
         '<div class="m-thumb" style="' + thumbStyle + '">' + iconSvg2 + '</div>' +
