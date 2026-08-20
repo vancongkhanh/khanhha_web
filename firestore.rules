@@ -11,9 +11,22 @@ service cloud.firestore {
         ];
     }
 
+    // Tài khoản riêng của trang nội bộ "Giá vốn" (site tách biệt, đăng nhập
+    // bằng 1 mật khẩu chung qua email cố định giavon@khanhha-web.internal).
+    function isGiaVonUser() {
+      return request.auth != null &&
+        request.auth.uid == 'AvUtb4x7jRhff4JwP7rGH3WQEKy2';
+    }
+
     match /products/{productId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if isAdmin() || isGiaVonUser();
+    }
+
+    // Lịch sử bán hàng ghi từ trang "Giá vốn" — chỉ admin và tài khoản
+    // Giá vốn đọc/ghi được, không công khai.
+    match /sales/{saleId} {
+      allow read, write: if isAdmin() || isGiaVonUser();
     }
 
     match /categories/{categoryId} {
